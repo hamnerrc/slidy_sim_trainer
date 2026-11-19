@@ -1,0 +1,322 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Speedsliding Atlas</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<div class="wrap">
+<header class="appbar">
+  <div class="appbar-row"><div class="brand">Speedsliding Atlas</div>
+  <nav class="views" aria-label="Views"><a href="#train" data-view="train">Train</a><a href="#advisor" data-view="advisor">Advisor</a><a href="#guide" data-view="guide">Guide</a></nav></div>
+  <nav class="rail" id="guideRail" aria-label="Guide sections" hidden>
+  <a href="#numbers">Real numbers</a><a href="#l3x2">3x2</a><a href="#l3x3">3x3</a><a href="#l4x3">4x3</a><a href="#l4x4">4x4</a><a href="#techniques">Techniques</a><a href="#setup">Setup &amp; tools</a><a href="#tiers">Tiers</a><a href="#sources">Sources</a>
+</nav>
+</header>
+<div id="view-train" class="view">
+  <div class="zen" id="zen">
+    <div class="zen-top">
+      <div class="seg" role="tablist" aria-label="Puzzle">
+        <button type="button" role="tab" data-key="3x2" aria-selected="true">3x2</button><button type="button" role="tab" data-key="3x3" aria-selected="false">3x3</button><button type="button" role="tab" data-key="4x3" aria-selected="false">4x3</button><button type="button" role="tab" data-key="4x4" aria-selected="false">4x4</button>
+      </div>
+      <div class="zen-tools">
+        <button type="button" class="icon" id="zGear" aria-label="Settings" aria-expanded="false" aria-controls="zPanel"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1" fill="none"/><circle cx="15" cy="6" r="2" fill="none"/><circle cx="9" cy="12" r="2" fill="none"/><circle cx="17" cy="18" r="2" fill="none"/></svg></button>
+        <button type="button" class="icon" id="zFs" aria-label="Fullscreen (F)"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" fill="none"/></svg></button>
+      </div>
+    </div>
+    <div class="zen-stage" id="zStage">
+      <div class="zen-target" id="zTarget">loading…</div>
+      <div class="zen-tag" id="zTag"></div>
+      <div class="zwrap"><div class="zboard" id="zBoard" aria-label="Sliding puzzle"></div><div class="zlock" aria-hidden="true"><i id="zLock"></i></div></div>
+      <div class="zen-sub" id="zSub"></div>
+      <div class="zen-fb" id="zFb" aria-live="polite"></div>
+      <div class="zen-seq" id="zSeq"></div>
+    </div>
+    <div class="zen-progress"><div class="zbar" aria-hidden="true"><i id="zBar"></i></div><span id="zProg"></span></div>
+    <aside class="zpanel" id="zPanel" hidden aria-label="Trainer settings">
+      <div class="zp-head"><h3>Settings</h3><button type="button" class="btn" id="zClose">Done</button></div>
+      <label class="zp-row" for="zSize">Board size<input type="range" id="zSize" min="35" max="100" step="1"></label>
+      <label class="zp-check"><input type="checkbox" id="zPre">Show the optimal movecount before solving</label>
+      <label class="zp-check"><input type="checkbox" id="zHover">Hover controls (the gap follows the mouse)</label>
+      <label class="zp-check"><input type="checkbox" id="zTimer">Show the timer while solving</label>
+      <label class="zp-row" for="zBuf">Pause before a new scramble accepts moves<select id="zBuf"><option value="0">None</option><option value="0.5">0.5 s</option><option value="1">1 s</option><option value="1.5">1.5 s</option><option value="2">2 s</option></select></label>
+      <label class="zp-row" for="zPace">Replay speed after a miss<select id="zPace"><option value="auto">Auto (about 6 s)</option><option value="2">2 moves/s</option><option value="4">4 moves/s</option><option value="8">8 moves/s</option></select></label>
+      <label class="zp-row" for="zPool">Training pool for <span id="zPuz"></span><select id="zPool"></select></label>
+      <div class="zp-block"><div class="zp-stats" id="zStats"></div><p class="note" id="zCounts" style="margin:0"></p><button type="button" class="btn" id="zUse">Use in advisor</button></div>
+      <p class="note" style="margin:0">Spaced repetition: a case you miss comes back after 3 solves. It leaves the pool once you solve it optimally 4 times in a row: after 3, 8 and 25 more solves, then once more after an 8-hour break. Another miss restarts the schedule.</p>
+      <div class="zp-danger">
+        <button type="button" class="btn" id="zReset">Reset <span id="zPuz2"></span> progress…</button>
+        <div id="zConfirm" hidden><p class="note">Erase cleared cases, reviews and solve history for this puzzle? This can't be undone.</p><button type="button" class="btn danger" id="zResetYes">Erase</button> <button type="button" class="btn" id="zResetNo">Cancel</button></div>
+        <button type="button" class="btn" id="zWipe">Erase all trainer data…</button>
+        <div id="zConfirmAll" hidden><p class="note">Erase progress and history for all four puzzles? This can't be undone.</p><button type="button" class="btn danger" id="zWipeYes">Erase everything</button> <button type="button" class="btn" id="zWipeNo">Cancel</button></div>
+      </div>
+    </aside>
+  </div>
+  <p class="zen-help note">Arrows, WASD or IJKL slide a tile into the gap · click or tap any tile in the gap's row or column · Space: next · R: replay a miss · F: fullscreen · 1–4: switch puzzle · progress is saved in this browser</p>
+</div>
+
+<div id="view-advisor" class="view" hidden>
+<!-- ADVISOR -->
+<section id="advisor" style="border-top:0;margin-top:0">
+  <div class="eyebrow">Tool</div>
+  <h2>What should I work on?</h2>
+  <div class="panel">
+    <div class="inputs">
+      <label for="advSize">Puzzle<select id="advSize"><option value="4x4">4x4 (15 puzzle)</option><option value="3x3">3x3 (8 puzzle)</option></select></label>
+      <label for="advAvg">Average of<select id="advAvg"><option value="5">ao5</option><option value="12">ao12</option><option value="50">ao50</option><option value="100" selected>ao100</option></select></label>
+      <label for="advMoves">Avg movecount<input id="advMoves" type="number" inputmode="decimal" min="1" step="any" value="112"></label>
+      <label for="advTime">Avg time (s)<input id="advTime" type="number" inputmode="decimal" min="0.05" step="any" value="10.5"></label>
+    </div>
+    <p class="note" id="advNote">Example values are filled in. Replace them with your own (single-tile moves, as Slidysim counts). ao50 or ao100 gives the truest picture, because ao5 and ao12 PBs are usually lucky on movecount.</p>
+    <div class="stats" id="advStats"></div>
+    <div class="chartwrap"><svg id="chart" viewBox="0 0 720 460" role="img" aria-label="Movecount versus TPS chart with leaderboard players and your position"></svg></div>
+    <div class="legend"><span><i style="background:var(--dot)"></i>a leaderboard player (same puzzle and average)</span><span><i style="background:var(--you)"></i>you</span><span>diagonal lines: equal time</span><span>click any cell for its plan</span></div>
+    <div class="advice" id="advOut"></div>
+  </div>
+</section>
+
+</div>
+
+<div id="view-guide" class="view" hidden>
+<header class="hero">
+  <div class="eyebrow">15 puzzle · speedsliding field guide · data as of Nov 2026</div>
+  <h1>Speedsliding Atlas</h1>
+  <p>Time = moves ÷ TPS. The advisor compares your two numbers against the 200-plus players on the Open Slidysim leaderboard who average your time, so the advice comes from real players, not guesses. The lessons then run from the last six cells back to the full puzzle. Every movecount budget is computed exactly.</p>
+  <div class="strip" id="heroStrip"></div>
+</header>
+<!-- NUMBERS -->
+<section id="numbers">
+  <div class="eyebrow">Reality check</div>
+  <h2>What the numbers actually are</h2>
+  <div class="two">
+    <div class="prose">
+      <h3>Where the movecount floor is</h3>
+      <p>These are exact averages over every scramble, computed by brute-force search (method in the sources). "Stage-optimal" means each stage is solved in the fewest possible moves, but you never break a finished stage.</p>
+      <div class="tablewrap"><table>
+        <thead><tr><th>Stage</th><th>Optimal avg</th><th>Max</th></tr></thead>
+        <tbody>
+          <tr><td>Row 1 (1–4) on 4x4</td><td class="num">26.9</td><td class="num">46</td></tr>
+          <tr><td>…just 1 &amp; 2</td><td class="num">16.3</td><td class="num">29</td></tr>
+          <tr><td>Column 5-9-13 on the 4x3</td><td class="num">18.8</td><td class="num">32</td></tr>
+          <tr><td>Row 5–8 on the 4x3 (LBL)</td><td class="num">21.1</td><td class="num">34</td></tr>
+          <tr><td>4x2 ending (LBL)</td><td class="num">22.7</td><td class="num">36</td></tr>
+          <tr><td>3x3, fully optimal</td><td class="num">21.97</td><td class="num">31</td></tr>
+          <tr><td>3x3 via shortest row, then best 3x2</td><td class="num">25.8</td><td class="num">—</td></tr>
+          <tr><td>…careless endpoint for the row</td><td class="num">27.3</td><td class="num">—</td></tr>
+          <tr><td>…row <i>or</i> column, whichever is cheaper</td><td class="num">23.9</td><td class="num">—</td></tr>
+          <tr><td>3x2 (last six cells), optimal</td><td class="num">12.62</td><td class="num">21</td></tr>
+          <tr><td>3x2 via column pair, then 2x2</td><td class="num">12.78</td><td class="num">—</td></tr>
+          <tr class="hl"><td><b>4x4 stage-optimal fringe</b></td><td class="num"><b>≈70–71</b></td><td class="num"></td></tr>
+          <tr class="hl"><td><b>4x4 stage-optimal LBL</b></td><td class="num"><b>≈70.6</b></td><td class="num"></td></tr>
+          <tr class="hl"><td><b>4x4 truly optimal</b></td><td class="num"><b>52.6</b></td><td class="num">80</td></tr>
+        </tbody>
+      </table></div>
+      <p class="note">The 4x4 method totals add up stage averages, which assumes each stage starts from a uniformly random position. That's close to true, but treat them as ±1.</p>
+    </div>
+    <div class="prose">
+      <h3>What people actually average</h3>
+      <p>Open Slidysim leaderboard, standard 4x4, ao100 PBs, grouped by rank. Each group's median.</p>
+      <div class="tablewrap"><table>
+        <thead><tr><th>Rank</th><th>Time</th><th>Moves</th><th>TPS</th></tr></thead>
+        <tbody>
+          <tr><td>1–10</td><td class="num">3.48</td><td class="num">81.0</td><td class="num">24.9</td></tr>
+          <tr><td>11–30</td><td class="num">4.29</td><td class="num">89.8</td><td class="num">21.2</td></tr>
+          <tr><td>31–60</td><td class="num">5.85</td><td class="num">96.9</td><td class="num">17.1</td></tr>
+          <tr><td>61–100</td><td class="num">7.41</td><td class="num">98.5</td><td class="num">13.7</td></tr>
+          <tr><td>101–150</td><td class="num">9.46</td><td class="num">108.6</td><td class="num">11.5</td></tr>
+          <tr><td>151–250</td><td class="num">14.61</td><td class="num">129.3</td><td class="num">9.0</td></tr>
+        </tbody>
+      </table></div>
+      <h3>Three facts this settles</h3>
+      <ul class="tight">
+        <li><b>Clean fringe lands around 100–120 at speed.</b> You were right: the leaderboard median ao100 is 104 moves.</li>
+        <li><b>The best speed averages are around 78, not under 70.</b> The top 10 ao100s run 75–94 moves at 21–29 TPS. Sub-70 shows up in their best ao12s (64.7–69.2). It also shows up in slow, efficiency-only averages: ao100 records of 55.9 to 66.7 moves at 1–6 TPS. Speed and movecount trade off at the top.</li>
+        <li><b>Sub-70 at speed means beating stage-optimal play.</b> Perfect stage-by-stage fringe is about 70. Getting under it consistently takes planning across stages: blocks that span the row and column, and choosing which stage to finish first.</li>
+        <li><b>The TPS ceiling is far higher than most guides say.</b> The best ao100s are at 28–31 TPS; ao12 34; 3x3 ao100 37.</li>
+      </ul>
+    </div>
+  </div>
+  <h3>Top 10, 4x4 ao100 (Open Slidysim, 1 Nov 2026)</h3>
+  <div class="tablewrap"><table id="topTable"><thead><tr><th>#</th><th>Player</th><th>Time</th><th>Moves</th><th>TPS</th></tr></thead><tbody></tbody></table></div>
+  <p class="note">Other records on the same board: 4x4 ao12 2.157 (dphdmn, 66.6 moves, 30.7 TPS); single 0.909; 3x3 ao100 0.736 (dphdmn, 37.0 TPS). The Speedsolving wiki's unofficial-records list (vovker 4.487 ao100) is out of date.</p>
+</section>
+
+<!-- STAGE 1 -->
+<section id="l3x2">
+  <div class="eyebrow">Stage 1 · last six cells (L6P)</div>
+  <h2>3x2</h2>
+  <div><div class="prose"><p><button class="btn primary" data-goto="3x2">Train the 3x2</button></p>
+      <p><b>360 positions. Optimal average 12.62; the hardest needs 21 (one position).</b> Tiles 10, 11, 12, 14, 15.</p>
+      <p><b>The method costs almost nothing.</b> Solve 10 over 14 as a column pair, then cycle the last three. Done with the best choices, that averages 12.78, only 0.16 over optimal. So the moves you lose here don't come from the method. They come from building the 10/14 pair the long way, or from cycling the 2x2 the wrong direction.</p>
+      <h3>What to actually learn</h3>
+      <ul class="tight">
+        <li><b>The six cells are a ring.</b> Running the gap around the ring rotates all five tiles one step. Most solutions are one rotation direction plus at most one pass through the middle edge.</li>
+        <li><b>Pair 10/14 in the shortest way.</b> Either build the pair as a vertical domino and drop it in, or use the hook: park 14 in 10's cell with 10 beside it, then rotate.</li>
+        <li><b>2x2 finish:</b> 12 positions, max 6 moves, mean 3. Read the cycle direction before you move.</li>
+        <li><b>Force easy endings early.</b> While you insert 10 and 14, steer 11, 12, 15 into cyclic order so the last step is a pure rotation (advice from the old Speedsolving thread).</li>
+      </ul>
+      <p><b>Drill:</b> scramble, solve, compare to optimal. Average within 0.5 of optimal, then make it a burst well above your average TPS. Top players run endings at 30+ TPS.</p>
+    </div>
+  </div>
+</section>
+
+<!-- STAGE 2 -->
+<section id="l3x3">
+  <div class="eyebrow">Stage 2 · the 8 puzzle</div>
+  <h2>3x3</h2>
+  <div><div class="prose"><p><button class="btn primary" data-goto="3x3">Train the 3x3</button></p>
+      <p><b>181,440 positions, optimal average 21.97, hardest 31.</b> Tiles 6–8, 10–12, 14–15. Leaderboard top-10 3x3 ao100s average 23–28 moves at 25–37 TPS. The leaderboard median is 32.7.</p>
+      <h3>Where moves go (exact)</h3>
+      <ul class="tight">
+        <li>Always solve row 6-7-8 by the shortest route, then the 3x2: <b>27.3</b> if you ignore what the 3x2 will look like.</li>
+        <li>Among the shortest row solutions, pick the one that leaves the easiest 3x2: <b>25.8</b> (saves 1.4).</li>
+        <li>Also choose between row 6-7-8 and column 6-10-14, whichever is cheaper: <b>23.9</b> (saves another 1.9).</li>
+        <li>Fully optimal, allowed to break and rebuild: <b>21.97</b>.</li>
+      </ul>
+      <p>So row-or-column choice is the single biggest learnable gain on the 3x3. When you miss in the 3x3 trainer, the replay shows the exact move where the optimal solution parts from yours, including the cases where it breaks the row.</p>
+      <h3>The last-two trick</h3>
+      <p>For 7 and 8 (the corner pair), set 8 in 7's cell with 7 directly below, then rotate both in. The column version (10 over 14) is the mirror. Better still, avoid needing it: place 7 and 8 as a horizontal pair and slide them in together.</p>
+    </div>
+  </div>
+</section>
+
+<!-- STAGE 3 -->
+<section id="l4x3">
+  <div class="eyebrow">Stage 3 · after row 1</div>
+  <h2>4x3</h2>
+  <div><div class="prose"><p><button class="btn primary" data-goto="4x3">Train the 4x3</button></p>
+      <p><b>239.5 million positions</b>, too many for a lookup table, so the trainer solves each scramble optimally in the background. Optimal 4x3 solutions average about 36 moves.</p>
+      <h3>Column (fringe) or row (LBL)</h3>
+      <p>Column 5-9-13 costs 18.8 optimal on average and leaves a 3x3 (about 24 with good row-or-column choice). Row 5–8 costs 21.1 and leaves a 4x2 (22.7 optimal). The totals are nearly identical (≈43–45), which is why top players report fringe and LBL as about equal and many use both. Choose by the scramble, not by habit.</p>
+      <h3>9 and 13</h3>
+      <p>Pair them before you insert: 9 on top of 13 as a vertical domino, then send them up together. The classic waste is placing 9, then breaking it to fetch 13.</p>
+      <h3>Overlap into the 3x3</h3>
+      <p>While inserting the column, carry 6 (or 6 and 10) along when they are on the way. Stage-perfect play is about 70; getting under 70 at speed needs exactly this kind of overlap.</p>
+    </div>
+  </div>
+</section>
+
+<!-- STAGE 4 -->
+<section id="l4x4">
+  <div class="eyebrow">Stage 4 · the full 15 puzzle</div>
+  <h2>4x4</h2>
+  <div><div class="prose"><p><button class="btn primary" data-goto="4x4">Train the 4x4</button></p>
+      <p><b>About 10.5 trillion positions; optimal average 52.6; hardest 80 (43 counting a whole-line slide as one move).</b></p>
+      <h3>Row 1 decides the solve</h3>
+      <p>The optimal row 1 already costs 26.9 on average, the largest single stage. Tiles 1 and 2 alone average 16.3 optimal.</p>
+      <ul class="tight">
+        <li>Plan 1 and 2 completely before the first move. Most sims start the clock on your first move, so planning time before it is free.</li>
+        <li>Place 3 and 4 as a vertical pair and insert them in one rotation.</li>
+        <li>Choose row first or column first (1-5-9-13) by which tiles are closer. The column-first stages have the same budgets by symmetry.</li>
+        <li>End row 1 with the gap where the next stage needs it.</li>
+      </ul>
+      <p>Hover mode in the trainer imitates Slidysim's mouse hover control: the gap follows your pointer along its row or column. Your solves can feed the advisor (Settings → Use in advisor).</p>
+    </div>
+  </div>
+</section>
+
+<!-- TECHNIQUES -->
+<section id="techniques">
+  <div class="eyebrow">Catalogue</div>
+  <h2>Every technique I could find</h2>
+  <p class="prose">Collected from the Speedsolving thread, the Slidysim README, the leaderboard data, and the exact computations above. A lot of current know-how lives in the Speedsliding Discord and in replays rather than in written guides. Where a technique's value can be measured, the number is given.</p>
+  <h3>Solution finding</h3>
+  <dl class="tech">
+    <div><dt>Reduction (fringe)<span class="tag">method</span></dt><dd>Row 1 + column 5-9-13, then row 6–8 + column 10-14, then cycle the 2x2. The standard speed method, and it scales to big puzzles. Within each L, do row first, column first, or both at once.<span class="src">Speedsolving 15-puzzle thread</span></dd></div>
+    <div><dt>Layer by layer<span class="tag">method</span></dt><dd>Row 1, row 2, then the 4x2 column by column (9&amp;13, 10&amp;14, cycle 11-12-15). Stage-optimal ≈70.6, the same as fringe. Many top players switch per scramble.<span class="src">thread; computed budgets</span></dd></div>
+    <div><dt>Row vs column choice<span class="tag">−1.9 moves on 3x3</span></dt><dd>At every reduction, solve whichever of the row or column is cheaper. Measured on the 3x3: 25.8 → 23.9.<span class="src">computed</span></dd></div>
+    <div><dt>Endpoint-aware stages<span class="tag">−1.4 moves on 3x3</span></dt><dd>Among equally short ways to finish a stage, pick the one that leaves the next stage easiest (gap position, pairs pre-formed). Measured: 27.3 → 25.8.<span class="src">computed</span></dd></div>
+    <div><dt>Last-two / corner trick</dt><dd>Last two tiles of a row: park the last tile in the second-last cell with the second-last tile under it, rotate in. Mirror for columns. This is the baseline. Every case where a direct pair insertion is shorter is a saved move.<span class="src">thread; many tutorials</span></dd></div>
+    <div><dt>Pairs and blocks</dt><dd>Solve 1-2, 3-4, 9-13, 7-8, 10-14 as dominoes. Tiles that are already adjacent in solved order are a free head start.<span class="src">thread (LNZ's block method)</span></dd></div>
+    <div><dt>Line up and send</dt><dd>Put several fringe tiles in one column in the right order, then move them all up in one looping motion.<span class="src">thread</span></dd></div>
+    <div><dt>Hook for 10/14</dt><dd>Get 14 beside 9 (10 not under it), bring 10 to the top, set it next to 14, put the gap under 14, drop 14 so 10 follows. This leaves a pure 3-cycle.<span class="src">thread (Jaycee)</span></dd></div>
+    <div><dt>Force the last 3</dt><dd>While solving 9 and 13, or 6-7-8, steer the remaining tiles so the final 2x2 is a short rotation. The 2x2 averages 3 moves but can take 6.<span class="src">thread (Ben)</span></dd></div>
+    <div><dt>Parking a tile out of place</dt><dd>Leave a tile in a "wrong" cell that the rest of the solve fixes for free. Example: Ranzha's row-first variant puts 12 in the 16 slot early and pushes it up at the end.<span class="src">thread</span></dd></div>
+    <div><dt>Cross-stage planning<span class="tag">needed for sub-70</span></dt><dd>Plan the row and column of an L together, and carry next-stage tiles along. Stage-perfect play is ≈70, so any consistent result under that requires it. Slow movecount ao100 records reach 55.9.<span class="src">computed; leaderboard moves PBs</span></dd></div>
+    <div><dt>Pre-planning</dt><dd>Plan the start before the timer runs. Most sims start the clock on your first move. Check yours.</dd></div>
+    <div><dt>Solver review</dt><dd>Compare your solve to optimal: the Discord bot's <code>!solve</code> (optimal 4x4), the README's Colab optimal solvers, Slidysim's built-in region solver, the replay site's "Get Optimal solution". The replay site also reports <b>Moves/MD</b>, your moves divided by the scramble's Manhattan distance, which is a quick efficiency measure.<span class="src">Slidysim README; Open Slidysim replay page</span></dd></div>
+    <div><dt>FMC sessions</dt><dd>Slidysim has an untimed fewest-moves (FMC) ranking. Use it to learn what's possible, then bring the patterns into timed solves.<span class="src">leaderboard categories</span></dd></div>
+  </dl>
+  <h3>Execution</h3>
+  <dl class="tech">
+    <div><dt>Hover controls<span class="tag">the standard</span></dt><dd>Mouse hover: the gap follows the pointer. The README calls it the most common input for speedsolving and calls keyboard objectively slower. Click mode exists mainly for FMC.<span class="src">Slidysim README</span></dd></div>
+    <div><dt>Zero animation</dt><dd>Set move duration to 0 in hover mode, and avoid tile gaps in hover mode.<span class="src">README</span></dd></div>
+    <div><dt>Lookahead</dt><dd>Find the next tile while finishing the current one, so the first move of each stage comes at full speed. In the data, the difference between rank 100 and rank 10 is mostly TPS: 13.7 → 24.9.<span class="src">leaderboard bands</span></dd></div>
+    <div><dt>Bursts on known endings</dt><dd>2x2 cycles and 3x2 solutions are short enough to run at your peak TPS. TPS PBs: 30.8 (ao100), 34.1 (ao12), 43.8 (single).<span class="src">leaderboard TPS PBs</span></dd></div>
+    <div><dt>Never-stop solving</dt><dd>Hold a TPS low enough that you never pause, then raise it. Pauses cost more than slow moves.</dd></div>
+    <div><dt>Display-type training</dt><dd>Slidysim display types change what you see. Minimal, Row minimal and Fringe minimal hide most tiles; Fading tiles and Last move test memory and tracking; Vanish on solved hides finished tiles; Manhattan and Vectors show distance or direction to home. Practice lookahead in them, then go back to Standard.<span class="src">README</span></dd></div>
+    <div><dt>3x3 as TPS training</dt><dd>The 3x3 is mostly execution: top ao100s run 25–37 TPS. Use it to warm up.</dd></div>
+    <div><dt>Marathons and relays</dt><dd>x10 and x42 marathons, and 2-N, width and height relays, build endurance and count in the power rankings.<span class="src">README; leaderboard categories</span></dd></div>
+    <div><dt>BLD</dt><dd>Numbers vanish after the first move. This is an extreme pre-planning drill; a 4.560 single is recorded.<span class="src">README; Speedsolving wiki</span></dd></div>
+    <div><dt>Color scheme</dt><dd>"Fringe 3" with Rainbow colors for 4x4. Grids (row grids, stacked layers) for big puzzles, switched with keys 1/2 mid-solve.<span class="src">README</span></dd></div>
+    <div><dt>Retry a scramble</dt><dd>Ctrl+Z replays the previous scramble without counting it. Use it to re-solve a bad solve with a better plan.<span class="src">README</span></dd></div>
+  </dl>
+</section>
+
+<!-- SETUP -->
+<section id="setup">
+  <div class="eyebrow">Practical</div>
+  <h2>Setup and tools</h2>
+  <div class="two">
+    <div class="prose">
+      <h3>Slidysim</h3>
+      <ul class="tight">
+        <li>Controls: Hover. Move duration 0. Scrambler: Random permutation (the only one accepted for records).</li>
+        <li>Keyboard+macros, and save/load used to replay a solution, are not allowed on the leaderboard.</li>
+        <li>Hold Ctrl or a mouse button to block moves in hover mode while you position the cursor before a solve.</li>
+        <li>Run the Records Manager beside Slidysim to upload PBs to the Open Slidysim leaderboard.</li>
+      </ul>
+    </div>
+    <div class="prose">
+      <h3>Analysis</h3>
+      <ul class="tight">
+        <li>Open Slidysim: rankings, replays with per-move timing, MD and Moves/MD, and an optimal solver for replays.</li>
+        <li>Speedsliding Discord bot: <code>!solve</code>, <code>!getwr</code>, <code>!rank</code>, <code>!draw</code>, <code>!animate</code>.</li>
+        <li>Slidysim Session Tracker (SST) for long-term stats.</li>
+        <li>Rankings use Power tiers (below) and Kinch scores across categories.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- TIERS -->
+<section id="tiers">
+  <div class="eyebrow">Community standard</div>
+  <h2>Open Slidysim tiers</h2>
+  <p class="prose">These are the thresholds the leaderboard itself uses for ranks. You reach a tier when your average is at or under the listed time. FMC is the untimed fewest-moves ranking. Its thresholds show what each level can do with unlimited thinking time, so don't expect them at speed.</p>
+  <div class="tablewrap"><table id="tierTable"></table></div>
+</section>
+
+<!-- SOURCES -->
+<section id="sources">
+  <div class="eyebrow">Read further</div>
+  <h2>Sources and method</h2>
+  <ul class="tight prose">
+    <li><a href="https://slidysim.github.io/" target="_blank" rel="noopener">Open Slidysim Leaderboard</a>. Its source (<a href="https://github.com/dphdmn/openslidy" target="_blank" rel="noopener">github.com/dphdmn/openslidy</a>) holds the tier thresholds and the Slidysim README.</li>
+    <li><a href="https://github.com/dphdmn/slidyarch" target="_blank" rel="noopener">Leaderboard archive (slidyarch)</a>, the 1 Nov 2026 snapshot. The scatter plot, rank bands and top-10 table come from it, using standard display and each player's best entry.</li>
+    <li><a href="https://www.speedsolving.com/threads/15-puzzle-discussion.31444/" target="_blank" rel="noopener">Speedsolving: 15 Puzzle discussion</a>: methods, Ben's annotated solves, the hook, forcing last-3, scrambling notes.</li>
+    <li><a href="https://www.speedsolving.com/wiki/index.php/List_of_Unofficial_World_Records" target="_blank" rel="noopener">Speedsolving wiki: unofficial records</a> (partly outdated for 15 puzzle).</li>
+    <li><a href="https://disboard.org/server/800441014611214337" target="_blank" rel="noopener">Speedsliding Discord</a>: where most current discussion lives.</li>
+    <li>Stage budgets: exact breadth-first search over every position of each sub-puzzle (tracked tiles plus gap), computed for this page. The 3x2 and 3x3 trainers rebuild their tables in your browser.</li>
+  </ul>
+</section>
+</div>
+</div>
+
+<script src="js/data.js"></script>
+<script src="js/puzzle.js"></script>
+<script src="js/hero.js"></script>
+<script src="js/solver.js"></script>
+<script src="js/trainer.js"></script>
+<script src="js/advisor.js"></script>
+<script src="js/tables.js"></script>
+<script src="js/views.js"></script>
+
+</body>
+</html>
