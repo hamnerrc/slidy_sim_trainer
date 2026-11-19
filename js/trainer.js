@@ -6,7 +6,8 @@ const ZEN=(function(){
   const PER=10;                        // cases per 3x3 depth / big-puzzle level
   const STEPS=[3,8,25,"break"];        // after a miss: optimal again after 3, 8, 25 solves, then after an 8 h break
   const BREAK_MS=8*3600e3;
-  const ui=Object.assign({tab:"3x2",pre:true,hover:false,timer:true,buf:1,pace:"auto",size:{}},store.get("ssa-ui-v3")||{});
+  const ui=Object.assign({tab:"3x2",pre:true,hover:true,timer:true,buf:1,pace:"auto",size:{}},store.get("ssa-ui-v3")||{});
+  if(!ui.hv1){ui.hover=true;ui.hv1=1}   // hover became the default; switch it on once for earlier visitors
   KEYS.forEach(k=>{if(!ui.size[k])ui.size[k]=80});
   const saveUI=()=>store.set("ssa-ui-v3",ui);
   const $=id=>document.getElementById(id);
@@ -98,6 +99,9 @@ const ZEN=(function(){
       t.addEventListener("pointerdown",e=>{e.preventDefault();closePanel();toCell(i)});
       t.addEventListener("pointerenter",e=>{if(ui.hover&&e.pointerType==="mouse")toCell(i)});
       boardEl.appendChild(t);C.cells.push(t)}}
+  // touch/pen: dragging a finger across the board moves the gap to the tile under it (hover mode)
+  boardEl.addEventListener("pointermove",e=>{if(!ui.hover||e.pointerType==="mouse"||!C.cells.length)return;
+    const el=document.elementFromPoint(e.clientX,e.clientY),i=el?C.cells.indexOf(el.closest&&el.closest(".tile")):-1;if(i>=0)toCell(i)});
   function render(){const P=C.d.P;C.b.forEach((v,i)=>{const t=C.cells[i];if(!t)return;
     if(!v){t.className="tile blank";t.textContent="";t.setAttribute("aria-label","gap")}
     else{const l=P.labels[v-1];t.className="tile "+sgrp(l);t.textContent=l;t.removeAttribute("aria-label")}})}
