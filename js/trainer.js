@@ -70,7 +70,25 @@ const ZEN=(function(){
   function cardItem(d,k){const c=d.prog.cards[k],lab=`review · ${c.step} of ${STEPS.length} done`;
     if(!d.big)return mkExact(d,k,{card:k,label:lab+" · depth "+table(d.key).dist.get(k)});
     const b=fromKey(d,k);return{b,sol:c.s,opt:c.s.length,ready:true,card:k,lvl:c.l,lb:lowerBound(b,d.P.w,d.P.h),label:lab}}
-  function pick(d){const p=d.prog,now=Date.now();let best=null;
+  /* ---------- review drill: only cases in review, until each is solved optimally DRILL times in a row ---------- */
+  const DRILL=2;
+  function drillLeft(d){return Object.keys(d.prog.cards).filter(k=>(d.drill.streak[k]||0)<DRILL)}
+  function drillPick(d){const ks=drillLeft(d);if(!ks.length)return null;
+    const pool=ks.length>1?ks.filter(k=>k!==d.lastK):ks,lo=Math.min(...pool.map(k=>d.drill.streak[k]||0)),c=pool.filter(k=>(d.drill.streak[k]||0)===lo);
+    const k=c[Math.floor(Math.random()*c.length)],it=cardItem(d,k),n=d.drill.streak[k]||0;it.label=`drill · ${n} of ${DRILL} in a row`+(d.big?"":" · depth "+it.depth);return it}
+  /* Drill solves leave the spaced-repetition schedule untouched. */
+  function drillJudge(d,it,mv){const k=keyOf(d,it.b),st=d.drill.streak;
+    if(mv===it.opt){st[k]=(st[k]||0)+1;return st[k]>=DRILL?"drilled · out of this drill":`${DRILL-st[k]} more in a row`}
+    st[k]=0;return "streak reset"}
+  function setDrill(on){const d=C.d;if(!d)return;d.drill=on?{streak:{}}:null;closePanel();drillUI();progUI();next()}
+  function drillUI(){const b=$("zDrill"),d=C.d;if(!b||!d)return;const n=Object.keys(d.prog.cards).length;
+    b.innerHTML=d.drill?'Back<span class="zl"> to training</span>':`Drill<span class="zl"> reviews</span>${n?` (${n})`:""}`;b.setAttribute("aria-pressed",d.drill?"true":"false");b.classList.toggle("on",!!d.drill);
+    b.disabled=!d.drill&&!n;b.title=d.drill?"Return to normal training":n?"Practice only the cases in review":"No cases in review yet"}
+  function drillDone(){const d=C.d,n=Object.keys(d.prog.cards).length;C.phase="done";C.it=null;C.b=goal(d.P.w*d.P.h);render();boardCls("good");lockAnim(0);boardEl.classList.remove("locked");
+    targetEl.innerHTML=n?`<b>${n}</b> review case${n>1?"s":""} drilled`:"nothing in review";tagEl.textContent="";subEl.textContent="";seqEl.innerHTML="";
+    fb(`<b class="z-ok">✓ ${n?"every review case solved optimally "+DRILL+" times in a row":"no cases left in review"}</b><div class="z-btns">${n?'<button class="z-link" data-z="drill">drill again</button>':""}<button class="z-link" data-z="exit">back to training</button></div>`)}
+
+  function pick(d){if(d.drill)return drillPick(d);const p=d.prog,now=Date.now();let best=null;
     for(const k in p.cards){const c=p.cards[k];if(k===d.lastK)continue;if(c.due<=p.clock&&(c.dueT||0)<=now&&(!best||c.due<p.cards[best].due))best=k}
     if(best)return cardItem(d,best);
     const it=newItem(d);if(it)return it;
@@ -125,7 +143,9 @@ const ZEN=(function(){
   function tick(){if(!C.running)return;setSub();requestAnimationFrame(tick)}
   const fb=h=>{fbEl.innerHTML=h};
   function lockAnim(ms){lockEl.style.transition="none";lockEl.style.width=ms?"100%":"0";void lockEl.offsetWidth;if(ms){lockEl.style.transition=`width ${ms}ms linear`;lockEl.style.width="0"}}
-  function progUI(){if(!C.d||(!C.d.big&&!C.d.byDepth))return;const g=progress(C.d);
+  function progUI(){if(!C.d||(!C.d.big&&!C.d.byDepth))return;drillUI();
+    if(C.d.drill){const n=Object.keys(C.d.prog.cards).length,left=drillLeft(C.d).length;barEl.style.width=(n?(n-left)/n*100:100).toFixed(1)+"%";progEl.textContent=`drilling reviews · ${n-left} / ${n} drilled · schedule unchanged`;return}
+    const g=progress(C.d);
     barEl.style.width=(Math.min(1,g.f)*100).toFixed(1)+"%";progEl.textContent=g.txt+(g.nc?` · ${g.nc} reviewing`:"")}
   function load(it){clearTimers();C.it=it;C.b=it.b.slice();C.moves=0;C.path="";C.running=false;C.time=0;C.div=null;
     C.d.lastK=keyOf(C.d,it.b);render();boardCls("");fb("");seqEl.innerHTML="";tagEl.textContent=it.label||"";
@@ -134,7 +154,7 @@ const ZEN=(function(){
     else{C.phase="solve";boardEl.classList.remove("locked")}
     setTarget();setSub()}
   function next(){clearTimers();const d=C.d;if(!d||(!d.big&&!d.byDepth))return;
-    const it=pick(d);
+    const it=pick(d);if(!it){drillDone();return}
     if(!it.ready){C.phase="wait";C.it=it;C.b=goal(d.P.w*d.P.h);render();boardCls("dim");boardEl.classList.remove("locked");lockAnim(0);tagEl.textContent=it.label||"";fb("");seqEl.innerHTML="";setTarget();subEl.textContent="";return}
     load(it)}
   function onItem(it){if(it!==C.it)return;
@@ -156,7 +176,7 @@ const ZEN=(function(){
     judgeFlow()}
   function judgeFlow(){const it=C.it;
     const ses=store.get("ssa3-"+C.key)||[];if(ses[C.sesIdx]&&ses[C.sesIdx].o==null){ses[C.sesIdx].o=it.opt;store.set("ssa3-"+C.key,ses)}
-    const note=judge(C.d,it,C.mv);progUI();
+    const note=C.d.drill?drillJudge(C.d,it,C.mv):judge(C.d,it,C.mv);progUI();
     if(C.mv===it.opt){C.phase="done";boardCls("good");
       fb(`<b class="z-ok">✓ optimal</b>${note?` <span class="z-mute">· ${note}</span>`:""}`);later(next,600)}
     else startReview(note)}
@@ -191,7 +211,7 @@ const ZEN=(function(){
 
   /* ---------- tabs, panel, fullscreen ---------- */
   const tabs=[...root.querySelectorAll('.seg [role="tab"]')];
-  function select(key){if(!PUZ[key])return;clearTimers();C.running=false;C.key=key;C.d=data(key);ui.tab=key;saveUI();
+  function select(key){if(!PUZ[key])return;clearTimers();C.running=false;C.key=key;C.d=data(key);ui.tab=key;saveUI();drillUI();
     tabs.forEach(t=>{const on=t.dataset.key===key;t.setAttribute("aria-selected",on);t.tabIndex=on?0:-1});
     buildCells();layout();C.it=null;C.b=goal(C.d.P.w*C.d.P.h);render();boardCls("dim");fb("");seqEl.innerHTML="";tagEl.textContent="";subEl.textContent="";
     if(panelOpen())fillPanel();
@@ -235,7 +255,8 @@ const ZEN=(function(){
   $("zWipe").addEventListener("click",()=>{$("zConfirmAll").hidden=false});
   $("zWipeNo").addEventListener("click",()=>{$("zConfirmAll").hidden=true});
   $("zWipeYes").addEventListener("click",()=>{KEYS.forEach(wipe);closePanel();select(C.key)});
-  fbEl.addEventListener("click",e=>{const a=e.target.closest("[data-z]");if(!a)return;a.blur();if(a.dataset.z==="replay"&&C.div)playReview();if(a.dataset.z==="next")next()});
+  fbEl.addEventListener("click",e=>{const a=e.target.closest("[data-z]");if(!a)return;a.blur();if(a.dataset.z==="replay"&&C.div)playReview();if(a.dataset.z==="next")next();if(a.dataset.z==="drill")setDrill(true);if(a.dataset.z==="exit")setDrill(false)});
+  $("zDrill").addEventListener("click",e=>{e.currentTarget.blur();setDrill(!C.d.drill)});
   stage.addEventListener("pointerdown",e=>{if(!e.target.closest("#zPanel"))closePanel()});
 
   const isFS=()=>document.fullscreenElement===root||root.classList.contains("pfs");

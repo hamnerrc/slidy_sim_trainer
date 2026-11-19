@@ -164,7 +164,11 @@ section{scroll-margin-top:120px}
 .seg button{border:0;background:transparent;color:var(--muted);font-family:var(--mono);font-size:.86rem;padding:6px 14px;border-radius:8px;cursor:pointer}
 .seg button[aria-selected=true]{background:var(--surface);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.14)}
 .seg button:focus-visible,.icon:focus-visible,.z-link:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
-.zen-tools{display:flex;gap:4px}
+.zen-tools{display:flex;gap:4px;align-items:center}
+button.btn.zdrill{padding:6px 10px;font-size:.8rem;white-space:nowrap}
+button.btn.zdrill.on{background:var(--accent);border-color:var(--accent);color:var(--bg)}
+@media (max-width:480px){.zdrill .zl{display:none}}
+button.btn.zdrill:disabled{opacity:.45;cursor:default;border-color:var(--line)}
 .icon{width:38px;height:38px;display:grid;place-items:center;border:0;border-radius:10px;background:transparent;color:var(--muted);cursor:pointer;padding:0}
 .icon:hover,.icon[aria-expanded=true],.icon.on{background:var(--sunk);color:var(--ink)}
 .zen-stage{display:grid;justify-items:center;align-content:center;gap:6px;padding-block:6px;min-width:0}
