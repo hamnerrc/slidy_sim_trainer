@@ -207,7 +207,7 @@ button.btn.zdrill:disabled{opacity:.45;cursor:default;border-color:var(--line)}
 .zp-head h3{margin:0}
 label.zp-check{display:flex;align-items:center;gap:8px;color:var(--ink);font-size:.88rem}
 label.zp-check input{width:auto}
-label.zp-row{color:var(--ink);font-size:.86rem}
+.zp-row{color:var(--ink);font-size:.86rem}
 .zp-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;width:100%}
 .zp-stats div{background:var(--sunk);border-radius:8px;padding:6px 8px;min-width:0}
 .zp-stats b{display:block;font-family:var(--mono);font-variant-numeric:tabular-nums}
@@ -236,3 +236,16 @@ button.btn.danger{border-color:var(--you);color:var(--you)}
 .mini span.a,.mini span.b,.mini span.c{background:var(--gap)}
 .mini span.s-r1{background:#fd696c}.mini span.s-c1{background:#fff062}.mini span.s-r2{background:#84fd6e}.mini span.s-c2{background:#84fedf}.mini span.s-r3{background:#90b6fd}.mini span.s-l{background:#cd8cfc}
 .mini{background:#222222}
+
+/* method steps */
+.zboard .tile.gr{background:#4a4a4a;color:#7c7c7c}
+.zboard .tile.fz{filter:saturate(.55) brightness(.8)}
+.z-step{background:var(--sunk);color:var(--ink);border-radius:6px;padding:2px 7px;letter-spacing:.04em}
+.z-okstep{color:var(--fb);font-family:var(--mono);font-size:.8rem;margin:0 4px;white-space:nowrap}
+.zp-inline{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.zp-inline input[type=text]{flex:1;min-width:0;font:inherit;font-family:var(--mono);font-size:.84rem;padding:7px 9px;border-radius:7px;border:1px solid var(--line);background:var(--sunk);color:var(--ink)}
+label.zp-mini{display:flex;align-items:center;gap:6px;font-size:.84rem;color:var(--muted)}
+.zp-custom summary{cursor:pointer;font-size:.86rem;color:var(--accent)}
+.zp-custom code{font-family:var(--mono)}
+.zp-err{color:var(--you)}
+.zp-err:empty{display:none}

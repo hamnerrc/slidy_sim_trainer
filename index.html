@@ -42,24 +42,46 @@
     <div class="zen-progress"><div class="zbar" aria-hidden="true"><i id="zBar"></i></div><span id="zProg"></span></div>
     <aside class="zpanel" id="zPanel" hidden aria-label="Trainer settings">
       <div class="zp-head"><h3>Settings</h3><button type="button" class="btn" id="zClose">Done</button></div>
+      <div class="zp-block zp-method">
+        <label class="zp-row" for="zMeth">Method for <span id="zPuz"></span><select id="zMeth"></select></label>
+        <p class="note" id="zMethNote" style="margin:0"></p>
+        <details class="zp-custom"><summary>Custom method</summary>
+          <p class="note" style="margin:6px 0">Steps in order, separated by “/”. Tiles in a step are joined with “-”. End with “rest” to solve the remainder optimally. Example: <code>1-5-9-13 / 4 / 2-3</code></p>
+          <div class="zp-inline"><input type="text" id="zCustom" placeholder="1-5-9-13 / 2 / 3-4" autocomplete="off" spellcheck="false" aria-label="Custom method steps"><button type="button" class="btn" id="zCustomAdd">Add</button></div>
+          <p class="note zp-err" id="zCustomErr" role="alert" style="margin:4px 0 0"></p>
+          <button type="button" class="btn" id="zCustomDel" hidden>Remove this custom method</button>
+        </details>
+      </div>
+      <label class="zp-row" for="zPool">Scrambles<select id="zPool"></select></label>
+      <div class="zp-block">
+        <span class="zp-row">Depth range · <span id="zDname"></span></span>
+        <div class="zp-inline"><label class="zp-mini" for="zDlo">from<select id="zDlo"></select></label><label class="zp-mini" for="zDhi">to<select id="zDhi"></select></label></div>
+        <p class="note" id="zDnote" style="margin:0"></p>
+      </div>
       <label class="zp-row" for="zSize">Board size<input type="range" id="zSize" min="35" max="100" step="1"></label>
-      <label class="zp-check"><input type="checkbox" id="zPre">Show the optimal movecount before solving</label>
+      <label class="zp-check"><input type="checkbox" id="zPre">Show the standard (movecount to beat) before solving</label>
       <label class="zp-check"><input type="checkbox" id="zHover">Hover controls (the gap follows the mouse, or your finger as you drag)</label>
       <label class="zp-check"><input type="checkbox" id="zTimer">Show the timer while solving</label>
       <label class="zp-row" for="zBuf">Pause before a new scramble accepts moves<select id="zBuf"><option value="0">None</option><option value="0.5">0.5 s</option><option value="1">1 s</option><option value="1.5">1.5 s</option><option value="2">2 s</option></select></label>
       <label class="zp-row" for="zPace">Replay speed after a miss<select id="zPace"><option value="auto">Auto (about 6 s)</option><option value="2">2 moves/s</option><option value="4">4 moves/s</option><option value="8">8 moves/s</option></select></label>
-      <label class="zp-row" for="zPool">Training pool for <span id="zPuz"></span><select id="zPool"></select></label>
       <div class="zp-block"><div class="zp-stats" id="zStats"></div><p class="note" id="zCounts" style="margin:0"></p><button type="button" class="btn" id="zUse">Use in advisor</button></div>
-      <p class="note" style="margin:0">Spaced repetition: a case you miss comes back after 3 solves. It leaves the pool once you solve it optimally 4 times in a row: after 3, 8 and 25 more solves, then once more after an 8-hour break. Another miss restarts the schedule.</p>
+      <p class="note" style="margin:0">Each step is graded against its own standard: the step's optimum, or for set-up steps the best total with the step that follows. Meeting it or beating it is a pass. Spaced repetition: a case you miss comes back after 3 solves and leaves the pool once you meet the standard 4 times in a row (after 3, 8 and 25 more solves, then after an 8-hour break). Another miss restarts the schedule.</p>
+      <div class="zp-block">
+        <span class="zp-row">Progress file</span>
+        <div class="zp-inline"><button type="button" class="btn" id="zExport">Export progress</button><button type="button" class="btn" id="zImport">Import progress…</button></div>
+        <input type="file" id="zImportFile" accept="application/json,.json" hidden>
+        <p class="note" id="zImportMsg" role="status" style="margin:0"></p>
+        <div id="zImportAsk" hidden><p class="note" style="margin:0 0 6px">Replace everything saved in this browser with the file, or merge the file's cleared cases and reviews into what is already here?</p><button type="button" class="btn danger" id="zImportReplace">Replace</button> <button type="button" class="btn" id="zImportMerge">Merge</button> <button type="button" class="btn" id="zImportCancel">Cancel</button></div>
+      </div>
       <div class="zp-danger">
         <button type="button" class="btn" id="zReset">Reset <span id="zPuz2"></span> progress…</button>
-        <div id="zConfirm" hidden><p class="note">Erase cleared cases, reviews and solve history for this puzzle? This can't be undone.</p><button type="button" class="btn danger" id="zResetYes">Erase</button> <button type="button" class="btn" id="zResetNo">Cancel</button></div>
+        <div id="zConfirm" hidden><p class="note">Erase cleared cases, reviews and solve history for <span id="zPuz3"></span>, for every method? This can't be undone.</p><button type="button" class="btn danger" id="zResetYes">Erase</button> <button type="button" class="btn" id="zResetNo">Cancel</button></div>
         <button type="button" class="btn" id="zWipe">Erase all trainer data…</button>
         <div id="zConfirmAll" hidden><p class="note">Erase progress and history for all four puzzles? This can't be undone.</p><button type="button" class="btn danger" id="zWipeYes">Erase everything</button> <button type="button" class="btn" id="zWipeNo">Cancel</button></div>
       </div>
     </aside>
   </div>
-  <p class="zen-help note">Arrows, WASD or IJKL slide a tile into the gap · click or tap any tile in the gap's row or column · Space: next · R: replay a miss · F: fullscreen · 1–4: switch puzzle · progress is saved in this browser</p>
+  <p class="zen-help note">Arrows, WASD or IJKL slide a tile into the gap · click or tap any tile in the gap's row or column · Space: next · R: replay a miss · F: fullscreen · 1–4: switch puzzle · grey tiles aren't part of the current step; tiles placed by earlier steps are locked · progress is saved in this browser (export it in Settings)</p>
 </div>
 
 <div id="view-advisor" class="view" hidden>
@@ -180,7 +202,7 @@
         <li>Also choose between row 6-7-8 and column 6-10-14, whichever is cheaper: <b>23.9</b> (saves another 1.9).</li>
         <li>Fully optimal, allowed to break and rebuild: <b>21.97</b>.</li>
       </ul>
-      <p>So row-or-column choice is the single biggest learnable gain on the 3x3. When you miss in the 3x3 trainer, the replay shows the exact move where the optimal solution parts from yours, including the cases where it breaks the row.</p>
+      <p>So row-or-column choice is the single biggest learnable gain on the 3x3. The trainer's 3x3 methods follow this ladder: row or column then the 3x2, the same set up for the 3x2, "row or column, whichever is better", an opening drill, and full optimal. When you miss, the replay shows the exact move where the standard parts from yours.</p>
       <h3>The last-two trick</h3>
       <p>For 7 and 8 (the corner pair), set 8 in 7's cell with 7 directly below, then rotate both in. The column version (10 over 14) is the mirror. Better still, avoid needing it: place 7 and 8 as a horizontal pair and slide them in together.</p>
     </div>
@@ -192,13 +214,14 @@
   <div class="eyebrow">Stage 3 · after row 1</div>
   <h2>4x3</h2>
   <div><div class="prose"><p><button class="btn primary" data-goto="4x3">Train the 4x3</button></p>
-      <p><b>239.5 million positions</b>, too many for a lookup table, so the trainer solves each scramble optimally in the background. Optimal 4x3 solutions average about 36 moves.</p>
+      <p><b>239.5 million positions</b>, too many to learn whole, so the 4x3 trainer trains the column step: 11,880 cases for 5-9-13, graded exactly, with the other tiles greyed out. The set-up methods grade the column together with the optimal 3x3 it leaves.</p>
       <h3>Column (fringe) or row (LBL)</h3>
       <p>Column 5-9-13 costs 18.8 optimal on average and leaves a 3x3 (about 24 with good row-or-column choice). Row 5–8 costs 21.1 and leaves a 4x2 (22.7 optimal). The totals are nearly identical (≈43–45), which is why top players report fringe and LBL as about equal and many use both. Choose by the scramble, not by habit.</p>
       <h3>9 and 13</h3>
       <p>Pair them before you insert: 9 on top of 13 as a vertical domino, then send them up together. The classic waste is placing 9, then breaking it to fetch 13.</p>
       <h3>Overlap into the 3x3</h3>
       <p>While inserting the column, carry 6 (or 6 and 10) along when they are on the way. Stage-perfect play is about 70; getting under 70 at speed needs exactly this kind of overlap.</p>
+      <p>Measured: an optimal column followed by an optimal 3x3 averages 40.8 moves when the column ignores the 3x3, and 39.4 when it picks the optimal column that leaves the best 3x3. Letting the column spend extra moves to force a better 3x3 pays: up to +2 moves gives 37.7, up to +4 gives 36.6, up to +6 gives 35.9. The "up to +2" method trains the first of these.</p>
     </div>
   </div>
 </section>
@@ -217,7 +240,8 @@
         <li>Choose row first or column first (1-5-9-13) by which tiles are closer. The column-first stages have the same budgets by symmetry.</li>
         <li>End row 1 with the gap where the next stage needs it.</li>
       </ul>
-      <p>Hover mode in the trainer imitates Slidysim's mouse hover control: the gap follows your pointer along its row or column. Your solves can feed the advisor (Settings → Use in advisor).</p>
+      <p>The 4x4 trainer trains the first block only, by the method you choose: one tile at a time (about 38.5 moves for row 1), two pairs (35.5), the whole row as one step (26.9), the row set up for column 5-9-13, or column-first and L-shaped orders. Splitting row 1 into pairs costs about 8 moves, so the whole-row method is the target.</p>
+      <p>Hover mode in the trainer imitates Slidysim's mouse hover control: the gap follows your pointer along its row or column. Full 3x3 solves can feed the advisor (Settings → Use in advisor).</p>
     </div>
   </div>
 </section>
@@ -314,6 +338,7 @@
 <script src="js/puzzle.js"></script>
 <script src="js/hero.js"></script>
 <script src="js/solver.js"></script>
+<script src="js/methods.js"></script>
 <script src="js/trainer.js"></script>
 <script src="js/advisor.js"></script>
 <script src="js/tables.js"></script>
