@@ -12,6 +12,7 @@ const ZEN=(function(){
   KEYS.forEach(k=>{if(!ui.size[k])ui.size[k]=80});
   const saveUI=()=>store.set("ssa-ui-v3",ui);
   const $=id=>document.getElementById(id);
+  const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
   const root=$("zen"),stage=$("zStage"),boardEl=$("zBoard"),lockEl=$("zLock"),tagEl=$("zTag"),targetEl=$("zTarget"),subEl=$("zSub"),fbEl=$("zFb"),seqEl=$("zSeq"),barEl=$("zBar"),progEl=$("zProg"),panel=$("zPanel");
 
   /* ---------- per-puzzle data (exact tables for the classic progression) ---------- */
@@ -63,11 +64,11 @@ const ZEN=(function(){
   function classicProgress(S){const d=S.d,p=S.prog;
     if(d.key==="3x2"){const m=Object.keys(p.mastered).length;return{f:m/359,txt:m>=359?"all 359 solved optimally":`${m} / 359 solved optimally`}}
     let a=0,t=0;for(let i=1;i<d.byDepth.length;i++){const tg=Math.min(d.byDepth[i].length,PER);t+=tg;a+=Math.min(d.mcount[i],tg)}
-    const s=classicSrc(S);return{f:a/t,txt:`${a} / ${t} cases · ${s?"depth "+s.slice(2):"all depths done · random states"}`}}
+    const s=classicSrc(S);return{f:a/t,txt:`${a} / ${t} cases`+(s?(ui.pre?" · depth "+s.slice(2):""):" · all depths done · random states")}}
   function classicItem(S){const d=S.d,p=S.prog,s=classicSrc(S);if(!s)return null;let k;
     if(s==="ord"){k=d.order.find(x=>!p.mastered[x]&&!p.cards[x]);if(!k)return null}
     else{const arr=d.byDepth[+s.slice(2)]||[],un=arr.filter(x=>!p.mastered[x]&&!p.cards[x]),pool=un.length?un:arr;if(!pool.length)return null;k=pool[Math.floor(Math.random()*pool.length)]}
-    const b=S.fromKey(k),dep=table(d.key).dist.get(k);return{b,depth:dep,isNew:!p.mastered[k],label:"depth "+dep+(p.mastered[k]?" · already solved":"")}}
+    const b=S.fromKey(k),dep=table(d.key).dist.get(k);return{b,depth:dep,isNew:!p.mastered[k],parts:[{t:p.mastered[k]?"already solved":"new case"},{t:"depth "+dep,d:1}]}}
 
   /* ---------- picking scrambles ---------- */
   function randomItem(S){const d=S.d,[lo,hi]=range(S);let b=null;
@@ -76,8 +77,8 @@ const ZEN=(function(){
     else b=METHODS.sampleFirst(d.key,first(S),lo,hi);
     if(!b)b=METHODS.fillBoard(d.key,[],null);
     const dep=depthOf(S,b),full=lo===1&&hi===METHODS.depthInfo(d.key,S.M).max;
-    return{b,depth:dep,isNew:S.classic?!S.prog.mastered[S.kof(b)]:true,label:(full?"random":"depth "+(lo===hi?lo:lo+"–"+hi))+" · depth "+dep}}
-  function cardItem(S,k){const c=S.prog.cards[k],b=S.fromKey(k);return{b,card:k,depth:depthOf(S,b),label:`review · ${c.step} of ${STEPS.length} done · depth ${depthOf(S,b)}`}}
+    return{b,depth:dep,isNew:S.classic?!S.prog.mastered[S.kof(b)]:true,parts:full?[{t:"random"},{t:"depth "+dep,d:1}]:[{t:"depth "+(lo===hi?lo:lo+"–"+hi)+" band",d:1},{t:"depth "+dep,d:1}]}}
+  function cardItem(S,k){const c=S.prog.cards[k],b=S.fromKey(k),dep=depthOf(S,b);return{b,card:k,depth:dep,parts:[{t:`review · ${c.step} of ${STEPS.length} done`},{t:"depth "+dep,d:1}]}}
   function pick(S){if(S.drill)return drillPick(S);const p=S.prog,now=Date.now();let best=null;
     for(const k in p.cards){const c=p.cards[k];if(k===S.lastK)continue;if(c.due<=p.clock&&(c.dueT||0)<=now&&(!best||c.due<p.cards[best].due))best=k}
     if(best)return cardItem(S,best);
@@ -89,7 +90,7 @@ const ZEN=(function(){
   function drillLeft(S){return Object.keys(S.prog.cards).filter(k=>(S.drill.streak[k]||0)<DRILL)}
   function drillPick(S){const ks=drillLeft(S);if(!ks.length)return null;
     const pool=ks.length>1?ks.filter(k=>k!==S.lastK):ks,lo=Math.min(...pool.map(k=>S.drill.streak[k]||0)),c=pool.filter(k=>(S.drill.streak[k]||0)===lo);
-    const k=c[Math.floor(Math.random()*c.length)],it=cardItem(S,k);it.label=`drill · ${S.drill.streak[k]||0} of ${DRILL} in a row · depth ${it.depth}`;return it}
+    const k=c[Math.floor(Math.random()*c.length)],it=cardItem(S,k);it.parts=[{t:`drill · ${S.drill.streak[k]||0} of ${DRILL} in a row`},{t:"depth "+it.depth,d:1}];return it}
   /* Drill solves leave the spaced-repetition schedule untouched. */
   function drillJudge(S,it,hit){const k=S.kof(it.b),st=S.drill.streak;
     if(hit){st[k]=(st[k]||0)+1;return st[k]>=DRILL?"drilled · out of this drill":`${DRILL-st[k]} more in a row`}
@@ -99,7 +100,7 @@ const ZEN=(function(){
     b.innerHTML=S.drill?'Back<span class="zl"> to training</span>':`Drill<span class="zl"> reviews</span>${n?` (${n})`:""}`;b.setAttribute("aria-pressed",S.drill?"true":"false");b.classList.toggle("on",!!S.drill);
     b.disabled=!S.drill&&!n;b.title=S.drill?"Return to normal training":n?"Practice only the cases in review":"No cases in review yet"}
   function drillDone(){const S=C.S,n=Object.keys(S.prog.cards).length;C.phase="done";C.it=null;C.R=null;C.b=goal(C.d.P.w*C.d.P.h);render();boardCls("good");lockAnim(0);boardEl.classList.remove("locked");
-    targetEl.innerHTML=n?`<b>${n}</b> review case${n>1?"s":""} drilled`:"nothing in review";tagEl.textContent="";subEl.textContent="";seqEl.innerHTML="";
+    targetEl.innerHTML=n?`<b>${n}</b> review case${n>1?"s":""} drilled`:"nothing in review";tagEl.textContent="";subEl.textContent="";seqEl.innerHTML="";stepsUI();
     fb(`<b class="z-ok">✓ ${n?"every review case met the standard "+DRILL+" times in a row":"no cases left in review"}</b><div class="z-btns">${n?'<button class="z-link" data-z="drill">drill again</button>':""}<button class="z-link" data-z="exit">back to training</button></div>`)}
 
   /* ---------- spaced repetition ---------- */
@@ -116,7 +117,7 @@ const ZEN=(function(){
 
   /* ---------- current solve ---------- */
   const C={key:null,d:null,S:null,it:null,b:null,moves:0,t0:0,running:false,phase:"idle",lockUntil:0,timers:[],cells:[],rv:null,
-    si:0,walls:[],R:null,sb:null,sp:"",std:null,dcur:0,res:[]};
+    si:0,walls:[],R:null,sb:null,sp:"",std:null,dcur:0,res:[],streak:0};
   const clearTimers=()=>{C.timers.forEach(clearTimeout);C.timers=[]};
   const later=(fn,ms)=>{C.timers.push(setTimeout(fn,ms))};
   function buildCells(){const P=C.d.P;boardEl.innerHTML="";boardEl.style.gridTemplateColumns=`repeat(${P.w},auto)`;C.cells=[];
@@ -146,15 +147,27 @@ const ZEN=(function(){
     if(sp.prefix)return `first ${sp.prefix} moves`;
     if(R.rest)return walls.length?restName(key,walls.length):key;
     const nm=METHODS.stepName(key,sp);return sp.la?`${nm} + ${nextName(key,R,walls)}`:nm}
+  /* while "show optimal" is off, nothing that reveals the case's optimum (standard, depth) is shown until the case ends */
+  const reveal=()=>ui.pre||C.phase==="done"||C.phase==="review";
+  function tagUI(){const it=C.it;tagEl.textContent=it&&it.parts?it.parts.filter(p=>!p.d||reveal()).map(p=>p.t).join(" · "):""}
   function setTarget(){const it=C.it;
-    if(C.phase==="build"){targetEl.innerHTML="building tables…";return}
+    if(C.phase==="build"){targetEl.innerHTML='<span class="z-lab">building tables…</span>';return}
     if(!it||!C.R)return;
-    const st=multi()?`<span class="z-step">step ${C.si+1}/${C.S.M.steps.length}</span> `:"",sp=C.R.spec;
-    const lab=sp.prefix?`first ${sp.prefix} moves · optimal`:C.R.rest&&!C.walls.length?"optimal":`${stepLabel(C.R)} ${sp.la?"best":"optimal"}`;
-    targetEl.innerHTML=`${st}${lab} <b>${!ui.pre&&(C.phase==="lock"||C.phase==="solve")?"?":C.std.std}</b>`}
-  function setSub(final){const t=C.running?(performance.now()-C.t0)/1000:(C.time||0);
-    if(final){subEl.textContent=`${C.moves} moves · ${fmt(C.time,2)} s · ${fmt(C.moves/C.time,1)} tps`;return}
-    subEl.textContent=ui.timer?`${C.moves} moves · ${fmt(C.running?t:0,2)} s`:`${C.moves} moves`}
+    const sp=C.R.spec,chips=!$("zSteps").hidden&&!sp.la,name=chips?"":sp.prefix?`first ${sp.prefix} moves`:C.R.rest&&!C.walls.length?C.key:stepLabel(C.R),kind=sp.la?"best set-up":"optimal";
+    targetEl.innerHTML=reveal()?`<span class="z-lab">${name?esc(name)+" · ":""}${kind}</span><b>${C.std.std}</b>`
+      :`${name?`<span class="z-lab">${esc(name)}</span>`:""}<span class="z-hid">${kind} hidden</span>`}
+  /* method steps as chips: done (with your moves), current, still to come */
+  function stepNames(){const key=C.key;let placed=0;
+    return C.S.M.steps.map(sp=>{const n=sp.prefix?`first ${sp.prefix}`:sp.rest?(placed?restName(key,placed):key):METHODS.stepName(key,sp);placed+=sp.t?sp.t.length:sp.alts?sp.alts[0].length:0;return n})}
+  function stepsUI(){const el=$("zSteps");if(!C.S||!C.it||C.S.M.steps.length<2||C.S.M.steps[0].prefix){el.hidden=true;el.innerHTML="";return}
+    const nm=stepNames(),fin=C.phase==="done";el.hidden=false;
+    el.innerHTML=nm.map((n,i)=>{const r=C.res[i];let cls="",extra="";
+      if(r){cls=r.pass?"ok":"bad";extra=`<em>${r.moves}</em>`}else if(i===C.si&&!fin)cls="now";
+      if(i===C.si&&r&&!r.pass)cls="bad";
+      return `<li class="${cls}">${r&&r.pass?"✓ ":r?"✗ ":""}${esc(n)}${extra}</li>`}).join("")}
+  function setSub(final){const t=C.running?(performance.now()-C.t0)/1000:(C.time||0),cell=(v,u)=>`<span><b>${v}</b>${u}</span>`;
+    if(final){subEl.innerHTML=cell(C.moves,"moves")+cell(fmt(C.time,2),"s")+cell(fmt(C.moves/C.time,1),"tps");return}
+    subEl.innerHTML=cell(C.moves,"moves")+(ui.timer?cell(fmt(C.running?t:0,2),"s"):"")}
   function tick(){if(!C.running)return;setSub();requestAnimationFrame(tick)}
   const fb=h=>{fbEl.innerHTML=h};
   function lockAnim(ms){lockEl.style.transition="none";lockEl.style.width=ms?"100%":"0";void lockEl.offsetWidth;if(ms){lockEl.style.transition=`width ${ms}ms linear`;lockEl.style.width="0"}}
@@ -163,17 +176,17 @@ const ZEN=(function(){
     if(S.drill){const n=Object.keys(S.prog.cards).length,left=drillLeft(S).length;barEl.style.width=(n?(n-left)/n*100:100).toFixed(1)+"%";progEl.textContent=`drilling reviews · ${n-left} / ${n} drilled · schedule unchanged`;return}
     const nc=Object.keys(S.prog.cards).length,rc=rolling(S,100),pct=rc.n?Math.round(rc.pass/rc.n*100):0;
     if(S.classic&&S.prog.src==="auto"&&classicSrc(S)){const g=classicProgress(S);barEl.style.width=(Math.min(1,g.f)*100).toFixed(1)+"%";
-      progEl.textContent=g.txt+(rc.n?` · ${pct}% met of last ${rc.n}`:"")+(nc?` · ${nc} reviewing`:"");return}
-    barEl.style.width=pct+"%";progEl.textContent=(rc.n?`standard met ${pct}% of last ${rc.n}`:"no solves yet with this method")+(nc?` · ${nc} reviewing`:"")}
+      progEl.textContent=g.txt+(rc.n?` · ${pct}% met of last ${rc.n}`:"")+(nc?` · ${nc} reviewing`:"")+(C.streak>1?` · streak ${C.streak}`:"");return}
+    barEl.style.width=pct+"%";progEl.textContent=(rc.n?`standard met ${pct}% of last ${rc.n}`:"no solves yet with this method")+(nc?` · ${nc} reviewing`:"")+(C.streak>1?` · streak ${C.streak}`:"")}
   function load(it){clearTimers();C.it=it;C.b=it.b.slice();C.moves=0;C.running=false;C.time=0;C.rv=null;C.si=0;C.walls=[];C.res=[];
-    C.S.lastK=C.S.kof(it.b);boardCls("");fb("");seqEl.innerHTML="";tagEl.textContent=it.label||"";
+    C.S.lastK=C.S.kof(it.b);boardCls("");fb("");seqEl.innerHTML="";C.phase="load";
     startStep();
     const ms=Math.round(ui.buf*1000);C.lockUntil=performance.now()+ms;lockAnim(ms);
     if(ms>0){C.phase="lock";boardEl.classList.add("locked");later(()=>{if(C.it===it&&C.phase==="lock"){C.phase="solve";boardEl.classList.remove("locked")}},ms)}
     else{C.phase="solve";boardEl.classList.remove("locked")}
-    setTarget();setSub()}
+    tagUI();stepsUI();setTarget();setSub()}
   function startStep(){const key=C.key;C.R=METHODS.resolve(key,C.S.M.steps[C.si],C.walls);C.sb=C.b.slice();C.sp="";
-    C.std=METHODS.standard(key,C.R,C.walls,C.b);C.dcur=C.R.f(C.b);render();setTarget();
+    C.std=METHODS.standard(key,C.R,C.walls,C.b);C.dcur=C.R.f(C.b);render();stepsUI();setTarget();
     // a step whose tiles are already home counts as done with 0 moves
     if(!C.R.spec.prefix&&METHODS.doneStep(C.R,C.b)){const v=METHODS.value(key,C.R,C.walls,C.b,0);stepDone(v<=C.std.std,v)}}
   function next(){clearTimers();const S=C.S;if(!S||!S.ready)return;
@@ -194,7 +207,7 @@ const ZEN=(function(){
     if(!pass){finishSolve(false);return}
     if(R.spec.prefix||C.si+1>=C.S.M.steps.length){finishSolve(true);return}
     C.walls=METHODS.wallsAfter(R,C.b,C.walls);C.si++;
-    fb(C.res.map(r=>`<span class="z-okstep">✓ ${r.name} ${r.moves}</span>`).join(" "));startStep()}
+    startStep()}
   function after(){render();if(C.phase==="solve"&&!ui.timer)setSub()}
   function moveDir(L){if(!canMove())return;const P=C.d.P,z=C.b.indexOf(0),x=z%P.w,y=(z/P.w)|0;let k=-1;
     if(L==="L"&&x<P.w-1)k=z+1;if(L==="R"&&x>0)k=z-1;if(L==="U"&&y<P.h-1)k=z+P.w;if(L==="D"&&y>0)k=z-P.w;if(k<0||isWall(k))return;step(k);after()}
@@ -212,14 +225,14 @@ const ZEN=(function(){
       rv.div=METHODS.diverge(C.key,R,rv.walls,rv.b0,rv.path,rv.std);if(C.si===0)e.k=rv.div.k}
     h.push(e);if(h.length>1000)h.shift();store.set(S.hk,h);
     const note=S.drill?drillJudge(S,it,pass):judge(S,it,pass);progUI();
-    if(pass){C.phase="done";boardCls("good");const last=C.res[C.res.length-1],beat=v<s;
-      const steps=multi()?C.res.map(r=>`<span class="z-okstep">✓ ${r.name} ${r.moves}</span>`).join(" ")+"<br>":"";
+    C.streak=pass?C.streak+1:0;
+    if(pass){C.phase="done";boardCls("good");tagUI();stepsUI();setTarget();progUI();const beat=v<s;
       const whole=S.M.steps.length===1&&S.M.steps[0].rest&&!S.M.steps[0].prefix;
-      fb(`${steps}<b class="z-ok">✓ ${beat?`beat the method by ${s-v}`:whole?"optimal":"standard met"}</b>${note?` <span class="z-mute">· ${note}</span>`:""}`);
+      fb(`<b class="z-ok">✓ ${beat?`beat the method by ${s-v}`:whole?"optimal":"standard met"}</b>${note?` <span class="z-mute">· ${note}</span>`:""}`);
       later(next,multi()?900:600);return}
-    C.rv=rv;C.phase="review";boardCls("bad");
+    C.rv=rv;C.phase="review";boardCls("bad");tagUI();stepsUI();setTarget();progUI();
     const r=rv.res,over=r.val-r.std;
-    C.head=(multi()?`<span class="z-mute">step ${C.si+1} · ${r.name}</span> `:"")+(rv.R.spec.prefix?`<b class="z-bad">✗</b> <span class="z-mute">· move ${r.moves} left the optimal path · ${note}</span>`
+    C.head=(multi()?`<span class="z-mute">${esc(r.name)}</span> `:"")+(rv.R.spec.prefix?`<b class="z-bad">✗</b> <span class="z-mute">· move ${r.moves} left the optimal path · ${note}</span>`
       :`<b class="z-bad">+${over}</b> <span class="z-mute">· standard ${r.std} · ${note}</span>`);
     playReview()}
 
@@ -248,12 +261,19 @@ const ZEN=(function(){
   function select(key){if(!PUZ[key])return;clearTimers();C.running=false;C.key=key;C.d=data(key);ui.tab=key;saveUI();
     C.S=mstate(C.d,curMethod(key));drillUI();
     tabs.forEach(t=>{const on=t.dataset.key===key;t.setAttribute("aria-selected",on);t.tabIndex=on?0:-1});
-    buildCells();layout();C.it=null;C.R=null;C.walls=[];C.b=goal(C.d.P.w*C.d.P.h);render();boardCls("dim");fb("");seqEl.innerHTML="";tagEl.textContent="";subEl.textContent="";
+    buildCells();layout();C.it=null;C.R=null;C.walls=[];C.res=[];C.streak=0;C.b=goal(C.d.P.w*C.d.P.h);render();boardCls("dim");fb("");seqEl.innerHTML="";tagEl.textContent="";subEl.textContent="";stepsUI();fillQuick();
     if(panelOpen())fillPanel();
     const S=C.S;
     if(!S.ready){C.phase="build";setTarget();setTimeout(()=>{if(C.S!==S)return;prepare(S);if(panelOpen())fillPanel();progUI();next()},40)}
     else{progUI();next()}}
   function setMethod(id){ui.meth[C.key]=id;saveUI();select(C.key)}
+  function fillQuick(){const L=methods(C.key),q=$("zMethQ");q.innerHTML=L.map(m=>`<option value="${m.id}">${esc(m.name)}${m.custom?" (custom)":""}</option>`).join("");q.value=C.S.M.id;q.title=C.S.M.desc||""}
+  $("zMethQ").addEventListener("change",e=>{e.target.blur();setMethod(e.target.value);if(panelOpen())fillPanel()});
+  /* show / hide optimal */
+  function eyeUI(){const b=$("zEye");b.setAttribute("aria-pressed",ui.pre?"true":"false");b.classList.toggle("off",!ui.pre);
+    const l=ui.pre?"Hide optimal (H)":"Show optimal (H)";b.setAttribute("aria-label",l);b.title=l;if(panelOpen())$("zPre").checked=ui.pre}
+  function setPre(on){ui.pre=on;saveUI();eyeUI();tagUI();setTarget();progUI()}
+  $("zEye").addEventListener("click",e=>{e.currentTarget.blur();setPre(!ui.pre)});
   tabs.forEach(t=>t.addEventListener("click",e=>{e.currentTarget.blur();select(t.dataset.key)}));
 
   /* ---------- settings panel ---------- */
@@ -277,14 +297,13 @@ const ZEN=(function(){
     $("zStats").innerHTML=st?`<div><b>${fmt(st.t)}</b><span>mean s</span></div><div><b>${fmt(st.m,1)}</b><span>moves</span></div><div><b>+${fmt(st.o,1)}</b><span>over std</span></div><div><b>${fmt(st.t?st.m/st.t:NaN,1)}</b><span>tps</span></div>`:`<p class="note" style="margin:0">No solves yet with this method.</p>`;
     const rc=rolling(S,100),nc=Object.keys(S.prog.cards).length,nm=S.classic?Object.keys(S.prog.mastered).length:null;
     let miss="";const ks=s.filter(x=>x.k!=null&&!x.p);if(ks.length>=5){const c={};ks.forEach(x=>{c[x.k+1]=(c[x.k+1]||0)+1});const top=Object.entries(c).sort((a,b)=>b[1]-a[1])[0];miss=` · misses most often on move ${top[0]} (${Math.round(top[1]/ks.length*100)}%)`}
-    $("zCounts").textContent=`last ${n} solves · standard met ${rc.n?Math.round(rc.pass/rc.n*100):0}%${nm!=null?` · ${nm} cases cleared`:""} · ${nc} in review${miss}`;
+    $("zCounts").hidden=!n;$("zCounts").textContent=`last ${n} solves · standard met ${rc.n?Math.round(rc.pass/rc.n*100):0}%${nm!=null?` · ${nm} cases cleared`:""} · ${nc} in review${miss}`;
     $("zUse").hidden=!(key==="3x3"&&S.classic)||!n;
     $("zConfirm").hidden=true;$("zConfirmAll").hidden=true;$("zImportAsk").hidden=true;$("zImportMsg").textContent=""}
-  const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
   $("zGear").addEventListener("click",e=>{e.currentTarget.blur();if(panelOpen())closePanel();else{fillPanel();panel.hidden=false;e.currentTarget.setAttribute("aria-expanded","true")}});
   $("zClose").addEventListener("click",closePanel);
   $("zSize").addEventListener("input",e=>{ui.size[C.key]=+e.target.value;saveUI();layout()});
-  $("zPre").addEventListener("change",e=>{ui.pre=e.target.checked;saveUI();setTarget()});
+  $("zPre").addEventListener("change",e=>setPre(e.target.checked));
   $("zHover").addEventListener("change",e=>{ui.hover=e.target.checked;saveUI()});
   $("zTimer").addEventListener("change",e=>{ui.timer=e.target.checked;saveUI();if(C.phase==="solve"||C.phase==="lock")setSub()});
   $("zBuf").addEventListener("change",e=>{ui.buf=+e.target.value;saveUI()});
@@ -362,8 +381,9 @@ const ZEN=(function(){
     if(e.key===" "||e.key==="Enter"){e.preventDefault();if(C.phase!=="build")next();return}
     if(e.key==="r"||e.key==="R"){if(C.rv&&(C.phase==="review"||C.phase==="done")){e.preventDefault();playReview()}return}
     if(e.key==="f"||e.key==="F"){e.preventDefault();toggleFS();return}
+    if(e.key==="h"||e.key==="H"){e.preventDefault();setPre(!ui.pre);return}
     if(/^[1-4]$/.test(e.key)){e.preventDefault();select(KEYS[+e.key-1])}});
 
-  return{start(){select(KEYS.includes(ui.tab)?ui.tab:"3x2")},select,layout,_state:()=>C,
+  return{start(){eyeUI();select(KEYS.includes(ui.tab)?ui.tab:"3x2")},select,layout,_state:()=>C,
     exitPseudo(){if(root.classList.contains("pfs"))setPseudo(false)}};
 })();

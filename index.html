@@ -25,13 +25,16 @@
       <div class="seg" role="tablist" aria-label="Puzzle">
         <button type="button" role="tab" data-key="3x2" aria-selected="true">3x2</button><button type="button" role="tab" data-key="3x3" aria-selected="false">3x3</button><button type="button" role="tab" data-key="4x3" aria-selected="false">4x3</button><button type="button" role="tab" data-key="4x4" aria-selected="false">4x4</button>
       </div>
+      <label class="zmq"><span class="sr">Method</span><select id="zMethQ" aria-label="Method"></select></label>
       <div class="zen-tools">
         <button type="button" class="btn zdrill" id="zDrill" aria-pressed="false">Drill reviews</button>
+        <button type="button" class="icon" id="zEye" aria-pressed="true" aria-label="Show the standard"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path class="eye-o" d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle class="eye-o" cx="12" cy="12" r="3"/><path class="eye-c" d="M3 3l18 18M10.6 5.1A10.6 10.6 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-3.2 4.2M6.6 6.6A17.6 17.6 0 0 0 2 12s3.5 7 10 7a9.9 9.9 0 0 0 5.4-1.6M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg></button>
         <button type="button" class="icon" id="zGear" aria-label="Settings" aria-expanded="false" aria-controls="zPanel"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1" fill="none"/><circle cx="15" cy="6" r="2" fill="none"/><circle cx="9" cy="12" r="2" fill="none"/><circle cx="17" cy="18" r="2" fill="none"/></svg></button>
         <button type="button" class="icon" id="zFs" aria-label="Fullscreen (F)"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" fill="none"/></svg></button>
       </div>
     </div>
     <div class="zen-stage" id="zStage">
+      <ol class="zen-steps" id="zSteps" aria-label="Method steps" hidden></ol>
       <div class="zen-target" id="zTarget">loading…</div>
       <div class="zen-tag" id="zTag"></div>
       <div class="zwrap"><div class="zboard" id="zBoard" aria-label="Sliding puzzle"></div><div class="zlock" aria-hidden="true"><i id="zLock"></i></div></div>
@@ -42,46 +45,68 @@
     <div class="zen-progress"><div class="zbar" aria-hidden="true"><i id="zBar"></i></div><span id="zProg"></span></div>
     <aside class="zpanel" id="zPanel" hidden aria-label="Trainer settings">
       <div class="zp-head"><h3>Settings</h3><button type="button" class="btn" id="zClose">Done</button></div>
-      <div class="zp-block zp-method">
-        <label class="zp-row" for="zMeth">Method for <span id="zPuz"></span><select id="zMeth"></select></label>
-        <p class="note" id="zMethNote" style="margin:0"></p>
+      <section class="zp-sec">
+        <h4>Method · <span id="zPuz"></span></h4>
+        <label class="zp-row" for="zMeth"><span class="sr">Method</span><select id="zMeth"></select></label>
+        <p class="note" id="zMethNote"></p>
         <details class="zp-custom"><summary>Custom method</summary>
-          <p class="note" style="margin:6px 0">Steps in order, separated by “/”. Tiles in a step are joined with “-”. End with “rest” to solve the remainder optimally. Example: <code>1-5-9-13 / 4 / 2-3</code></p>
+          <p class="note">Steps in order, separated by “/”. Tiles in a step are joined with “-”. End with “rest” to solve the remainder optimally. Example: <code>1-5-9-13 / 4 / 2-3</code></p>
           <div class="zp-inline"><input type="text" id="zCustom" placeholder="1-5-9-13 / 2 / 3-4" autocomplete="off" spellcheck="false" aria-label="Custom method steps"><button type="button" class="btn" id="zCustomAdd">Add</button></div>
-          <p class="note zp-err" id="zCustomErr" role="alert" style="margin:4px 0 0"></p>
+          <p class="note zp-err" id="zCustomErr" role="alert"></p>
           <button type="button" class="btn" id="zCustomDel" hidden>Remove this custom method</button>
         </details>
-      </div>
-      <label class="zp-row" for="zPool">Scrambles<select id="zPool"></select></label>
-      <div class="zp-block">
+      </section>
+      <section class="zp-sec">
+        <h4>Scrambles</h4>
+        <label class="zp-row" for="zPool">Source<select id="zPool"></select></label>
         <span class="zp-row">Depth range · <span id="zDname"></span></span>
         <div class="zp-inline"><label class="zp-mini" for="zDlo">from<select id="zDlo"></select></label><label class="zp-mini" for="zDhi">to<select id="zDhi"></select></label></div>
-        <p class="note" id="zDnote" style="margin:0"></p>
-      </div>
-      <label class="zp-row" for="zSize">Board size<input type="range" id="zSize" min="35" max="100" step="1"></label>
-      <label class="zp-check"><input type="checkbox" id="zPre">Show the standard (movecount to beat) before solving</label>
-      <label class="zp-check"><input type="checkbox" id="zHover">Hover controls (the gap follows the mouse, or your finger as you drag)</label>
-      <label class="zp-check"><input type="checkbox" id="zTimer">Show the timer while solving</label>
-      <label class="zp-row" for="zBuf">Pause before a new scramble accepts moves<select id="zBuf"><option value="0">None</option><option value="0.5">0.5 s</option><option value="1">1 s</option><option value="1.5">1.5 s</option><option value="2">2 s</option></select></label>
-      <label class="zp-row" for="zPace">Replay speed after a miss<select id="zPace"><option value="auto">Auto (about 6 s)</option><option value="2">2 moves/s</option><option value="4">4 moves/s</option><option value="8">8 moves/s</option></select></label>
-      <div class="zp-block"><div class="zp-stats" id="zStats"></div><p class="note" id="zCounts" style="margin:0"></p><button type="button" class="btn" id="zUse">Use in advisor</button></div>
-      <p class="note" style="margin:0">Each step is graded against its own standard: the step's optimum, or for set-up steps the best total with the step that follows. Meeting it or beating it is a pass. Spaced repetition: a case you miss comes back after 3 solves and leaves the pool once you meet the standard 4 times in a row (after 3, 8 and 25 more solves, then after an 8-hour break). Another miss restarts the schedule.</p>
-      <div class="zp-block">
-        <span class="zp-row">Progress file</span>
+        <p class="note" id="zDnote"></p>
+      </section>
+      <section class="zp-sec">
+        <h4>While solving</h4>
+        <label class="zp-check"><input type="checkbox" id="zPre" role="switch"><span>Show optimal<small>The movecount to beat and the case's depth. When off, both stay hidden until the case ends.</small></span></label>
+        <label class="zp-check"><input type="checkbox" id="zTimer" role="switch"><span>Show the timer</span></label>
+        <label class="zp-check"><input type="checkbox" id="zHover" role="switch"><span>Hover controls<small>The gap follows the mouse, or your finger as you drag.</small></span></label>
+        <label class="zp-row" for="zSize">Board size<input type="range" id="zSize" min="35" max="100" step="1"></label>
+        <label class="zp-row" for="zBuf">Pause before a new scramble accepts moves<select id="zBuf"><option value="0">None</option><option value="0.5">0.5 s</option><option value="1">1 s</option><option value="1.5">1.5 s</option><option value="2">2 s</option></select></label>
+        <label class="zp-row" for="zPace">Replay speed after a miss<select id="zPace"><option value="auto">Auto (about 6 s)</option><option value="2">2 moves/s</option><option value="4">4 moves/s</option><option value="8">8 moves/s</option></select></label>
+      </section>
+      <section class="zp-sec">
+        <h4>Last 100 solves</h4>
+        <div class="zp-stats" id="zStats"></div><p class="note" id="zCounts"></p><button type="button" class="btn" id="zUse">Use in advisor</button>
+        <details class="zp-custom"><summary>How grading works</summary>
+        <p class="note">Each step is graded against its own standard: the step's optimum, or for set-up steps the best total with the step that follows. Meeting it or beating it is a pass. Spaced repetition: a case you miss comes back after 3 solves and leaves the pool once you meet the standard 4 times in a row (after 3, 8 and 25 more solves, then after an 8-hour break). Another miss restarts the schedule.</p></details>
+      </section>
+      <section class="zp-sec">
+        <h4>Progress file</h4>
         <div class="zp-inline"><button type="button" class="btn" id="zExport">Export progress</button><button type="button" class="btn" id="zImport">Import progress…</button></div>
         <input type="file" id="zImportFile" accept="application/json,.json" hidden>
-        <p class="note" id="zImportMsg" role="status" style="margin:0"></p>
-        <div id="zImportAsk" hidden><p class="note" style="margin:0 0 6px">Replace everything saved in this browser with the file, or merge the file's cleared cases and reviews into what is already here?</p><button type="button" class="btn danger" id="zImportReplace">Replace</button> <button type="button" class="btn" id="zImportMerge">Merge</button> <button type="button" class="btn" id="zImportCancel">Cancel</button></div>
-      </div>
-      <div class="zp-danger">
+        <p class="note" id="zImportMsg" role="status"></p>
+        <div id="zImportAsk" hidden><p class="note">Replace everything saved in this browser with the file, or merge the file's cleared cases and reviews into what is already here?</p><div class="zp-inline"><button type="button" class="btn danger" id="zImportReplace">Replace</button><button type="button" class="btn" id="zImportMerge">Merge</button><button type="button" class="btn" id="zImportCancel">Cancel</button></div></div>
+      </section>
+      <section class="zp-sec zp-danger">
+        <h4>Danger zone</h4>
         <button type="button" class="btn" id="zReset">Reset <span id="zPuz2"></span> progress…</button>
-        <div id="zConfirm" hidden><p class="note">Erase cleared cases, reviews and solve history for <span id="zPuz3"></span>, for every method? This can't be undone.</p><button type="button" class="btn danger" id="zResetYes">Erase</button> <button type="button" class="btn" id="zResetNo">Cancel</button></div>
+        <div id="zConfirm" hidden><p class="note">Erase cleared cases, reviews and solve history for <span id="zPuz3"></span>, for every method? This can't be undone.</p><div class="zp-inline"><button type="button" class="btn danger" id="zResetYes">Erase</button><button type="button" class="btn" id="zResetNo">Cancel</button></div></div>
         <button type="button" class="btn" id="zWipe">Erase all trainer data…</button>
-        <div id="zConfirmAll" hidden><p class="note">Erase progress and history for all four puzzles? This can't be undone.</p><button type="button" class="btn danger" id="zWipeYes">Erase everything</button> <button type="button" class="btn" id="zWipeNo">Cancel</button></div>
-      </div>
+        <div id="zConfirmAll" hidden><p class="note">Erase progress and history for all four puzzles? This can't be undone.</p><div class="zp-inline"><button type="button" class="btn danger" id="zWipeYes">Erase everything</button><button type="button" class="btn" id="zWipeNo">Cancel</button></div></div>
+      </section>
     </aside>
   </div>
-  <p class="zen-help note">Arrows, WASD or IJKL slide a tile into the gap · click or tap any tile in the gap's row or column · Space: next · R: replay a miss · F: fullscreen · 1–4: switch puzzle · grey tiles aren't part of the current step; tiles placed by earlier steps are locked · progress is saved in this browser (export it in Settings)</p>
+  <details class="zen-help">
+    <summary>Controls</summary>
+    <ul>
+      <li><span><kbd>←</kbd><kbd>↑</kbd><kbd>→</kbd><kbd>↓</kbd> · <kbd>WASD</kbd> · <kbd>IJKL</kbd></span>slide a tile into the gap</li>
+      <li><span>click / tap</span>any tile in the gap's row or column</li>
+      <li><span><kbd>Space</kbd></span>next case</li>
+      <li><span><kbd>R</kbd></span>replay a miss</li>
+      <li><span><kbd>H</kbd></span>show / hide optimal</li>
+      <li><span><kbd>F</kbd></span>fullscreen</li>
+      <li><span><kbd>1</kbd>–<kbd>4</kbd></span>switch puzzle</li>
+    </ul>
+    <p class="note">Grey tiles aren't part of the current step; tiles placed by earlier steps are locked. Progress is saved in this browser (export it in Settings).</p>
+  </details>
 </div>
 
 <div id="view-advisor" class="view" hidden>
