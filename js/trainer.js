@@ -6,7 +6,7 @@ const ZEN=(function(){
   const PER=10;                        // cases per 3x3 depth in the depth-by-depth progression
   const STEPS=[3,8,25,"break"];        // after a miss: standard again after 3, 8, 25 solves, then after an 8 h break
   const BREAK_MS=8*3600e3;
-  const ui=Object.assign({tab:"3x2",pre:true,hover:true,timer:true,buf:1,pace:"auto",size:{}},store.get("ssa-ui-v3")||{});
+  const ui=Object.assign({tab:"3x2",pre:true,stats:false,hover:true,timer:true,buf:1,pace:"auto",size:{}},store.get("ssa-ui-v3")||{});
   if(!ui.hv1){ui.hover=true;ui.hv1=1}   // hover became the default; switch it on once for earlier visitors
   ui.meth=ui.meth||{};ui.rng=ui.rng||{};ui.custom=ui.custom||{};
   KEYS.forEach(k=>{if(!ui.size[k])ui.size[k]=80});
@@ -171,8 +171,47 @@ const ZEN=(function(){
   function tick(){if(!C.running)return;setSub();requestAnimationFrame(tick)}
   const fb=h=>{fbEl.innerHTML=h};
   function lockAnim(ms){lockEl.style.transition="none";lockEl.style.width=ms?"100%":"0";void lockEl.offsetWidth;if(ms){lockEl.style.transition=`width ${ms}ms linear`;lockEl.style.width="0"}}
+  /* Stats over a list of solves. "over" is moves minus each case's own standard, per solve, so a run of hard
+     (deep) cases doesn't inflate it; "opt" is the mean standard of those same cases. With trim (csTimer / Slidysim
+     style aoN) the best and worst 5% of each figure are dropped (one each for ao5 and ao12); otherwise a plain mean. */
+  const stdOf=x=>x.s!=null?x.s:x.o;
+  function tmean(a,trim){if(!a.length)return NaN;if(!trim||a.length<3)return a.reduce((x,y)=>x+y,0)/a.length;
+    const c=Math.max(1,Math.ceil(a.length*.05)),b=a.slice().sort((x,y)=>x-y).slice(c,a.length-c);return b.reduce((x,y)=>x+y,0)/b.length}
+  function stats(h,trim){const n=h.length;if(!n)return null;
+    const g=h.filter(x=>stdOf(x)!=null),ov=g.map(x=>(x.v!=null?x.v:x.m)-stdOf(x)),mo=ov.length?ov.reduce((a,b)=>a+b,0)/ov.length:NaN;
+    const t=tmean(h.map(x=>x.t),trim),m=tmean(h.map(x=>x.m),trim);
+    return{n,t,m,opt:g.length?g.reduce((a,x)=>a+stdOf(x),0)/g.length:NaN,o:tmean(ov,trim),sd:ov.length>1?Math.sqrt(ov.reduce((a,b)=>a+(b-mo)**2,0)/(ov.length-1)):NaN,tps:t?m/t:NaN}}
+  /* best aoN moves and time anywhere in the saved history, cached per history length */
+  let bestC={};
+  function bestAo(S,h,w){const id=S.hk+"|"+w+"|"+h.length+"|"+(h.length&&h[h.length-1].t);if(bestC[id])return bestC[id];
+    let bm=Infinity,bt=Infinity;for(let i=w;i<=h.length;i++){const a=h.slice(i-w,i);bm=Math.min(bm,w===1?a[0].m:tmean(a.map(x=>x.m),1));bt=Math.min(bt,w===1?a[0].t:tmean(a.map(x=>x.t),1))}
+    return bestC[id]={m:bm,t:bt}}
+  /* stats table under the board: last solve, ao5 … ao1000 as the history allows, and this session's mean */
+  const WIN=[5,12,50,100,200,500,1000];
+  function liveUI(){const el=$("zLive"),b=$("zStatBtn");b.setAttribute("aria-pressed",ui.stats?"true":"false");b.classList.toggle("on",ui.stats);
+    const l=ui.stats?"Hide stats (T)":"Show stats (T)";b.setAttribute("aria-label",l);b.title=l;
+    el.hidden=!ui.stats;if(!ui.stats||!C.S)return;
+    const S=C.S,h=hist(S),n=h.length;
+    if(!n){el.innerHTML='<p class="zl-none">no solves yet with this method</p>';return}
+    const rows=[["last",1,1]];WIN.forEach(w=>{if(n>=w)rows.push(["ao"+w,w,1])});
+    const sn=Math.min(S.sess||0,n);if(sn>1)rows.push(["session",sn,0]);
+    // change from the same figure one solve earlier (lower is better for moves, over and time)
+    const dl=(a,p,k)=>{if(!p||!isFinite(a[k])||!isFinite(p[k]))return"";const d=a[k]-p[k];if(Math.abs(d)<.005)return"";return `<i class="${d<0?"dn":"up"}">${d<0?"▼":"▲"}${fmt(Math.abs(d),2)}</i>`};
+    const pb=(v,cur)=>isFinite(v)?`<small class="${cur<=v+1e-9?"pb":""}">${cur<=v+1e-9?"PB":"best "+fmt(v,2)}</small>`:"";
+    const head=`<div class="zl-h"><span>${n} solve${n>1?"s":""}</span><span>moves</span><span>optimal</span><span>over</span><span>σ</span><span>time</span><span>tps</span></div>`;
+    el.innerHTML=head+rows.map(([lab,w,trim])=>{const a=stats(h.slice(-w),trim),sess=lab==="session",last=w===1&&!sess;
+      const p=sess?stats(h.slice(-w,-1),0):last?null:n>w?stats(h.slice(-w-1,-1),trim):null,bst=sess?null:bestAo(S,h,w);
+      return `<div class="zl-r"><span class="zl-l">${sess?`session <small>${w} mean</small>`:lab}</span>`+
+        `<span><b>${fmt(a.m,last?0:2)}</b>${dl(a,p,"m")}${bst&&n>w?pb(bst.m,a.m):""}</span>`+
+        `<span>${fmt(a.opt,last?0:2)}</span>`+
+        `<span><b>${isFinite(a.o)?"+"+fmt(a.o,last?0:2):"—"}</b>${dl(a,p,"o")}</span>`+
+        `<span>${!last&&isFinite(a.sd)?"±"+fmt(a.sd,1):""}</span>`+
+        `<span>${fmt(a.t,2)}${dl(a,p,"t")}${bst&&n>w?pb(bst.t,a.t):""}</span>`+
+        `<span>${fmt(a.tps,1)}</span></div>`}).join("")+
+      `<p class="zl-note">aoN drops the best and worst 5% (1 each for ao5 / ao12) · over = moves − each case's optimal, so hard cases don't count against you · σ = spread of over</p>`}
+  function setStats(on){ui.stats=on;saveUI();liveUI()}
   function rolling(S,n){const h=hist(S).slice(-n);return{n:h.length,pass:h.filter(x=>x.p!=null?x.p:x.m===x.o).length}}
-  function progUI(){const S=C.S;if(!S||!S.ready)return;drillUI();
+  function progUI(){const S=C.S;if(!S||!S.ready)return;drillUI();liveUI();
     if(S.drill){const n=Object.keys(S.prog.cards).length,left=drillLeft(S).length;barEl.style.width=(n?(n-left)/n*100:100).toFixed(1)+"%";progEl.textContent=`drilling reviews · ${n-left} / ${n} drilled · schedule unchanged`;return}
     const nc=Object.keys(S.prog.cards).length,rc=rolling(S,100),pct=rc.n?Math.round(rc.pass/rc.n*100):0;
     if(S.classic&&S.prog.src==="auto"&&classicSrc(S)){const g=classicProgress(S);barEl.style.width=(Math.min(1,g.f)*100).toFixed(1)+"%";
@@ -223,7 +262,7 @@ const ZEN=(function(){
     let rv=null;
     if(!pass){const R=C.R;rv={b0:C.sb,path:C.sp,R,walls:C.walls.slice(),std:C.std,res:C.res[C.res.length-1]};
       rv.div=METHODS.diverge(C.key,R,rv.walls,rv.b0,rv.path,rv.std);if(C.si===0)e.k=rv.div.k}
-    h.push(e);if(h.length>1000)h.shift();store.set(S.hk,h);
+    h.push(e);if(h.length>1000)h.shift();store.set(S.hk,h);S.sess=(S.sess||0)+1;
     const note=S.drill?drillJudge(S,it,pass):judge(S,it,pass);progUI();
     C.streak=pass?C.streak+1:0;
     if(pass){C.phase="done";boardCls("good");tagUI();stepsUI();setTarget();progUI();const beat=v<s;
@@ -274,6 +313,7 @@ const ZEN=(function(){
     const l=ui.pre?"Hide optimal (H)":"Show optimal (H)";b.setAttribute("aria-label",l);b.title=l;if(panelOpen())$("zPre").checked=ui.pre}
   function setPre(on){ui.pre=on;saveUI();eyeUI();tagUI();setTarget();progUI()}
   $("zEye").addEventListener("click",e=>{e.currentTarget.blur();setPre(!ui.pre)});
+  $("zStatBtn").addEventListener("click",e=>{e.currentTarget.blur();setStats(!ui.stats)});
   tabs.forEach(t=>t.addEventListener("click",e=>{e.currentTarget.blur();select(t.dataset.key)}));
 
   /* ---------- settings panel ---------- */
@@ -293,8 +333,8 @@ const ZEN=(function(){
       $("zDlo").innerHTML=o;$("zDhi").innerHTML=o;$("zDlo").value=String(lo);$("zDhi").value=String(hi);$("zDname").textContent=inf.name}
     $("zDlo").disabled=$("zDhi").disabled=auto||!S.ready;$("zDnote").textContent=auto?"Used with random states.":"Optimal moves of the first step. Pick one depth, a band, or “x and up” by setting the top to the maximum.";
     const s=hist(S).slice(-100),n=s.length;
-    const st=n?{t:s.reduce((a,x)=>a+x.t,0)/n,m:s.reduce((a,x)=>a+x.m,0)/n,o:s.reduce((a,x)=>a+((x.v!=null?x.v:x.m)-(x.s!=null?x.s:x.o)),0)/n}:null;
-    $("zStats").innerHTML=st?`<div><b>${fmt(st.t)}</b><span>mean s</span></div><div><b>${fmt(st.m,1)}</b><span>moves</span></div><div><b>+${fmt(st.o,1)}</b><span>over std</span></div><div><b>${fmt(st.t?st.m/st.t:NaN,1)}</b><span>tps</span></div>`:`<p class="note" style="margin:0">No solves yet with this method.</p>`;
+    const st=stats(s);
+    $("zStats").innerHTML=st?`<div><b>${fmt(st.t)}</b><span>mean s</span></div><div><b>${fmt(st.m,1)}</b><span>moves</span></div><div><b>${fmt(st.opt,1)}</b><span>optimal</span></div><div><b>+${fmt(st.o,1)}</b><span>over (±${fmt(st.sd,1)})</span></div><div><b>${fmt(st.tps,1)}</b><span>tps</span></div>`:`<p class="note" style="margin:0">No solves yet with this method.</p>`;
     const rc=rolling(S,100),nc=Object.keys(S.prog.cards).length,nm=S.classic?Object.keys(S.prog.mastered).length:null;
     let miss="";const ks=s.filter(x=>x.k!=null&&!x.p);if(ks.length>=5){const c={};ks.forEach(x=>{c[x.k+1]=(c[x.k+1]||0)+1});const top=Object.entries(c).sort((a,b)=>b[1]-a[1])[0];miss=` · misses most often on move ${top[0]} (${Math.round(top[1]/ks.length*100)}%)`}
     $("zCounts").hidden=!n;$("zCounts").textContent=`last ${n} solves · standard met ${rc.n?Math.round(rc.pass/rc.n*100):0}%${nm!=null?` · ${nm} cases cleared`:""} · ${nc} in review${miss}`;
@@ -382,8 +422,9 @@ const ZEN=(function(){
     if(e.key==="r"||e.key==="R"){if(C.rv&&(C.phase==="review"||C.phase==="done")){e.preventDefault();playReview()}return}
     if(e.key==="f"||e.key==="F"){e.preventDefault();toggleFS();return}
     if(e.key==="h"||e.key==="H"){e.preventDefault();setPre(!ui.pre);return}
+    if(e.key==="t"||e.key==="T"){e.preventDefault();setStats(!ui.stats);return}
     if(/^[1-4]$/.test(e.key)){e.preventDefault();select(KEYS[+e.key-1])}});
 
-  return{start(){eyeUI();select(KEYS.includes(ui.tab)?ui.tab:"3x2")},select,layout,_state:()=>C,
+  return{start(){eyeUI();liveUI();select(KEYS.includes(ui.tab)?ui.tab:"3x2")},select,layout,_state:()=>C,
     exitPseudo(){if(root.classList.contains("pfs"))setPseudo(false)}};
 })();

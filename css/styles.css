@@ -208,7 +208,7 @@ button.btn.zdrill:disabled{opacity:.45;cursor:default;border-color:var(--line)}
 label.zp-check{display:flex;align-items:center;gap:8px;color:var(--ink);font-size:.88rem}
 label.zp-check input{width:auto}
 .zp-row{color:var(--ink);font-size:.86rem}
-.zp-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;width:100%}
+.zp-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(68px,1fr));gap:6px;width:100%}
 .zp-stats div{background:var(--sunk);border-radius:8px;padding:6px 8px;min-width:0}
 .zp-stats b{display:block;font-family:var(--mono);font-variant-numeric:tabular-nums}
 .zp-stats span{font-size:.7rem;color:var(--muted)}
@@ -343,3 +343,18 @@ kbd{font-family:var(--mono);font-size:.72rem;padding:1px 6px;border-radius:5px;b
 .zp-stats > p{grid-column:1/-1}
 @media (max-width:420px){.zen-top{column-gap:2px}.zen-top .seg button{padding:6px 9px}.zen{padding-inline:10px}}
 @media (max-width:640px){.zmq{margin-right:6px}}
+.zen-live{display:grid;grid-template-columns:5.5em repeat(6,auto);gap:2px 16px;align-items:baseline;justify-content:center;font-family:var(--mono);font-size:.74rem;color:var(--muted);padding:8px 0 10px;font-variant-numeric:tabular-nums;overflow-x:auto}
+.zen-live[hidden]{display:none}
+.zen-live .zl-h,.zen-live .zl-r{display:contents}
+.zen-live .zl-h span{font-size:.66rem;text-transform:uppercase;letter-spacing:.04em}
+.zen-live .zl-r span{white-space:nowrap}
+.zen-live .zl-l{color:var(--ink)}.zen-live .zl-l small{color:var(--muted)}
+.zen-live b{color:var(--ink);font-weight:600}
+.zen-live i{font-style:normal;font-size:.66rem;margin-left:3px}
+.zen-live .dn{color:var(--fb)}.zen-live .up{color:var(--you)}
+.zen-live .zl-none{margin:0;grid-column:1/-1;text-align:center}
+.zen-live .zl-r small{display:block;font-size:.62rem;color:var(--muted);line-height:1.1}
+.zen-live .zl-r small.pb{color:var(--fb);font-weight:600}
+.zen-live .zl-l small{display:inline}
+.zen-live .zl-note{grid-column:1/-1;margin:6px 0 0;font-size:.64rem;text-align:center;max-width:46em;justify-self:center}
+@media (max-width:520px){.zen-live{gap:2px 9px;grid-template-columns:4.6em repeat(6,auto)}}
