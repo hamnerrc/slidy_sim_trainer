@@ -7,14 +7,15 @@
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
-<link rel="stylesheet" href="css/styles.css?v=20261123a">
+<link rel="stylesheet" href="css/styles.css?v=20261124a">
 </head>
 <body>
 
 <div class="wrap">
 <header class="appbar">
   <div class="appbar-row"><div class="brand">Speedsliding Atlas</div>
-  <nav class="views" aria-label="Views"><a href="#train" data-view="train">Train</a><a href="#advisor" data-view="advisor">Advisor</a><a href="#guide" data-view="guide">Guide</a></nav></div>
+  <div class="appbar-end"><nav class="views" aria-label="Views"><a href="#train" data-view="train">Train</a><a href="#advisor" data-view="advisor">Advisor</a><a href="#guide" data-view="guide">Guide</a></nav>
+  <button type="button" class="icon" id="keysBtn" aria-label="Key bindings" title="Key bindings"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/></svg></button></div></div>
   <nav class="rail" id="guideRail" aria-label="Guide sections" hidden>
   <a href="#numbers">Real numbers</a><a href="#l3x2">3x2</a><a href="#l3x3">3x3</a><a href="#l4x3">4x3</a><a href="#l4x4">4x4</a><a href="#techniques">Techniques</a><a href="#setup">Setup &amp; tools</a><a href="#tiers">Tiers</a><a href="#sources">Sources</a>
 </nav>
@@ -23,7 +24,7 @@
   <div class="zen" id="zen">
     <div class="zen-top">
       <div class="seg" role="tablist" aria-label="Puzzle">
-        <button type="button" role="tab" data-key="3x2" aria-selected="true">3x2</button><button type="button" role="tab" data-key="3x3" aria-selected="false">3x3</button><button type="button" role="tab" data-key="4x3" aria-selected="false">4x3</button><button type="button" role="tab" data-key="4x4" aria-selected="false">4x4</button>
+        <button type="button" role="tab" data-key="3x2" aria-selected="true">3x2</button><button type="button" role="tab" data-key="3x3" aria-selected="false">3x3</button><button type="button" role="tab" data-key="4x3" aria-selected="false">4x3</button><button type="button" role="tab" data-key="4x4" aria-selected="false">4x4</button><button type="button" role="tab" data-key="seq" aria-selected="false" title="Sequence trainer: several stages in one solve">Seq</button>
       </div>
       <label class="zmq"><span class="sr">Method</span><select id="zMethQ" aria-label="Method"></select></label>
       <div class="zen-tools">
@@ -45,69 +46,98 @@
     </div>
     <div class="zen-live" id="zLive" hidden aria-live="off"></div>
     <div class="zen-progress"><div class="zbar" aria-hidden="true"><i id="zBar"></i></div><span id="zProg"></span></div>
-    <aside class="zpanel" id="zPanel" hidden aria-label="Trainer settings">
-      <div class="zp-head"><h3>Settings</h3><button type="button" class="btn" id="zClose">Done</button></div>
-      <section class="zp-sec">
-        <h4>Method · <span id="zPuz"></span></h4>
-        <label class="zp-row" for="zMeth"><span class="sr">Method</span><select id="zMeth"></select></label>
-        <p class="note" id="zMethNote"></p>
-        <details class="zp-custom"><summary>Custom method</summary>
+    <div class="zpanel" id="zPanel" hidden role="dialog" aria-modal="true" aria-labelledby="zpTitle">
+     <div class="zp-sheet">
+      <div class="zp-head"><h3 id="zpTitle"><span id="zPuz"></span> settings</h3><button type="button" class="btn" id="zClose">Done</button></div>
+      <nav class="zp-nav" aria-label="Settings pages">
+        <button type="button" data-page="method" id="zpNavMethod">Method</button><button type="button" data-page="scr">Scrambles</button><button type="button" data-page="solve">Solving</button><button type="button" data-page="prog">Progress</button>
+      </nav>
+      <div class="zp-body">
+       <div class="zp-page" data-page="method">
+        <section class="zp-sec" id="zSeqSec" hidden>
+          <h4>Sequence</h4>
+          <div class="zp-two"><label class="zp-row" for="zSeqFrom">Start from<select id="zSeqFrom"></select></label>
+          <label class="zp-row" for="zSeqTo">Go<select id="zSeqTo"></select></label></div>
+          <label class="zp-check" id="zSeqMirRow"><input type="checkbox" id="zSeqMir" role="switch"><span>Mirrored starts<small id="zSeqMirNote"></small></span></label>
+          <h4 class="zp-h5">A method for each stage</h4>
+          <div class="zp-seqst" id="zSeqStages"></div>
+          <p class="note zp-exp" id="zSeqExp" aria-live="polite"></p>
+          <p class="note">Methods are written the usual way round; each stage is turned to match the board (build column 1 first and the 4x3 stage becomes a 3x4, so column 5-9-13 becomes row 2-3-4). A missed step doesn't stop the solve: finish it, and every miss is reviewed at the end, each from the board you really reached.</p>
+        </section>
+        <section class="zp-sec" id="zMethSec">
+          <h4>Method</h4>
+          <label class="zp-row" for="zMeth" id="zMethRow"><span class="sr">Method</span><select id="zMeth"></select></label>
+          <p class="note" id="zMethNote"></p>
+          <p class="note zp-exp" id="zMethExp" aria-live="polite"></p>
+        <details class="zp-custom" id="zCustomBox"><summary>Custom method</summary>
           <p class="note">Steps in order, separated by “/”. Tiles in a step are joined with “-”. End with “rest” to solve the remainder optimally. Example: <code>1-5-9-13 / 4 / 2-3</code></p>
           <div class="zp-inline"><input type="text" id="zCustom" placeholder="1-5-9-13 / 2 / 3-4" autocomplete="off" spellcheck="false" aria-label="Custom method steps"><button type="button" class="btn" id="zCustomAdd">Add</button></div>
           <p class="note zp-err" id="zCustomErr" role="alert"></p>
           <button type="button" class="btn" id="zCustomDel" hidden>Remove this custom method</button>
         </details>
-      </section>
-      <section class="zp-sec">
-        <h4>Scrambles</h4>
+        </section>
+        <section class="zp-sec" id="zOrderSec">
+          <h4>Order</h4>
+          <label class="zp-check" id="zPickRow" hidden><input type="checkbox" id="zPick" role="switch"><span>Pick the best order<small id="zPickNote"></small></span></label>
+          <label class="zp-check" id="zFlexRow"><input type="checkbox" id="zFlex" role="switch"><span>Flexible order<small id="zFlexNote"></small></span></label>
+        </section>
+        <section class="zp-sec">
+          <h4>Bigger steps</h4>
+          <label class="zp-row" for="zMerge">When you're ready<select id="zMerge"></select></label>
+          <p class="note" id="zMergeNote"></p>
+        </section>
+       </div>
+       <div class="zp-page" data-page="scr">
+        <section class="zp-sec">
+          <h4>Scrambles</h4>
         <label class="zp-row" for="zPool">Source<select id="zPool"></select></label>
         <span class="zp-row">Depth range · <span id="zDname"></span></span>
         <div class="zp-inline"><label class="zp-mini" for="zDlo">from<select id="zDlo"></select></label><label class="zp-mini" for="zDhi">to<select id="zDhi"></select></label></div>
         <p class="note" id="zDnote"></p>
-      </section>
-      <section class="zp-sec">
-        <h4>While solving</h4>
+        <label class="zp-check" id="zAltRow" hidden><input type="checkbox" id="zAlt" role="switch"><span id="zAltTxt"></span></label>
+        </section>
+       </div>
+       <div class="zp-page" data-page="solve">
+        <section class="zp-sec">
+          <h4>While solving</h4>
         <label class="zp-check"><input type="checkbox" id="zPre" role="switch"><span>Show optimal<small>The movecount to beat and the case's depth. When off, both stay hidden until the case ends.</small></span></label>
         <label class="zp-check"><input type="checkbox" id="zTimer" role="switch"><span>Show the timer</span></label>
         <label class="zp-check"><input type="checkbox" id="zHover" role="switch"><span>Hover controls<small>The gap follows the mouse, or your finger as you drag.</small></span></label>
         <label class="zp-row" for="zSize">Board size<input type="range" id="zSize" min="35" max="100" step="1"></label>
         <label class="zp-row" for="zBuf">Pause before a new scramble accepts moves<select id="zBuf"><option value="0">None</option><option value="0.5">0.5 s</option><option value="1">1 s</option><option value="1.5">1.5 s</option><option value="2">2 s</option></select></label>
         <label class="zp-row" for="zPace">Replay speed after a miss<select id="zPace"><option value="auto">Auto (about 6 s)</option><option value="2">2 moves/s</option><option value="4">4 moves/s</option><option value="8">8 moves/s</option></select></label>
-      </section>
-      <section class="zp-sec">
-        <h4>Last 100 solves</h4>
+        </section>
+       </div>
+       <div class="zp-page" data-page="prog">
+        <section class="zp-sec">
+          <h4>Last 100 solves</h4>
         <div class="zp-stats" id="zStats"></div><p class="note" id="zCounts"></p><button type="button" class="btn" id="zUse">Use in advisor</button>
         <details class="zp-custom"><summary>How grading works</summary>
         <p class="note">Each step is graded against its own standard: the step's optimum, or for set-up steps the best total with the step that follows. Meeting it or beating it is a pass. Spaced repetition: a case you miss comes back after 3 solves and leaves the pool once you meet the standard 4 times in a row (after 3, 8 and 25 more solves, then after an 8-hour break). Another miss restarts the schedule.</p></details>
-      </section>
-      <section class="zp-sec">
-        <h4>Progress file</h4>
+        </section>
+        <section class="zp-sec">
+          <h4>Progress file</h4>
         <div class="zp-inline"><button type="button" class="btn" id="zExport">Export progress</button><button type="button" class="btn" id="zImport">Import progress…</button></div>
         <input type="file" id="zImportFile" accept="application/json,.json" hidden>
         <p class="note" id="zImportMsg" role="status"></p>
         <div id="zImportAsk" hidden><p class="note">Replace everything saved in this browser with the file, or merge the file's cleared cases and reviews into what is already here?</p><div class="zp-inline"><button type="button" class="btn danger" id="zImportReplace">Replace</button><button type="button" class="btn" id="zImportMerge">Merge</button><button type="button" class="btn" id="zImportCancel">Cancel</button></div></div>
-      </section>
-      <section class="zp-sec zp-danger">
-        <h4>Danger zone</h4>
+        </section>
+        <section class="zp-sec zp-danger">
+          <h4>Danger zone</h4>
         <button type="button" class="btn" id="zReset">Reset <span id="zPuz2"></span> progress…</button>
         <div id="zConfirm" hidden><p class="note">Erase cleared cases, reviews and solve history for <span id="zPuz3"></span>, for every method? This can't be undone.</p><div class="zp-inline"><button type="button" class="btn danger" id="zResetYes">Erase</button><button type="button" class="btn" id="zResetNo">Cancel</button></div></div>
         <button type="button" class="btn" id="zWipe">Erase all trainer data…</button>
         <div id="zConfirmAll" hidden><p class="note">Erase progress and history for all four puzzles? This can't be undone.</p><div class="zp-inline"><button type="button" class="btn danger" id="zWipeYes">Erase everything</button><button type="button" class="btn" id="zWipeNo">Cancel</button></div></div>
-      </section>
-    </aside>
+        </section>
+       </div>
+      </div>
+     </div>
+    </div>
   </div>
   <details class="zen-help">
     <summary>Controls</summary>
-    <ul>
-      <li><span><kbd>←</kbd><kbd>↑</kbd><kbd>→</kbd><kbd>↓</kbd> · <kbd>WASD</kbd> · <kbd>IJKL</kbd></span>slide a tile into the gap</li>
-      <li><span>click / tap</span>any tile in the gap's row or column</li>
-      <li><span><kbd>Space</kbd></span>next case</li>
-      <li><span><kbd>R</kbd></span>replay a miss</li>
-      <li><span><kbd>H</kbd></span>show / hide optimal</li>
-      <li><span><kbd>T</kbd></span>show / hide stats (session, ao100, ao200…)</li>
-      <li><span><kbd>F</kbd></span>fullscreen</li>
-      <li><span><kbd>1</kbd>–<kbd>4</kbd></span>switch puzzle</li>
-    </ul>
+    <ul id="zHelpKeys"></ul>
+    <p class="note">Change any key with the keyboard button at the top right of the page.</p>
     <p class="note">Grey tiles aren't part of the current step; tiles placed by earlier steps are locked. Progress is saved in this browser (export it in Settings).</p>
   </details>
 </div>
@@ -362,15 +392,25 @@
 </div>
 </div>
 
-<script src="js/data.js?v=20261123a"></script>
-<script src="js/puzzle.js?v=20261123a"></script>
-<script src="js/hero.js?v=20261123a"></script>
-<script src="js/solver.js?v=20261123a"></script>
-<script src="js/methods.js?v=20261123a"></script>
-<script src="js/trainer.js?v=20261123a"></script>
-<script src="js/advisor.js?v=20261123a"></script>
-<script src="js/tables.js?v=20261123a"></script>
-<script src="js/views.js?v=20261123a"></script>
+<dialog class="keysdlg" id="keysDlg" aria-labelledby="keysTitle">
+  <div class="kd-head"><h3 id="keysTitle">Key bindings</h3><button type="button" class="btn" id="keysDone">Done</button></div>
+  <p class="note">Click a key to remove it, or “+ key” and press the one to add. A key belongs to one action at a time. Saved in this browser.</p>
+  <ul class="kd-list" id="keysList"></ul>
+  <p class="note kd-msg" id="keysMsg" aria-live="polite"></p>
+  <button type="button" class="btn" id="keysReset">Reset to defaults</button>
+</dialog>
+
+<script src="js/data.js?v=20261124a"></script>
+<script src="js/puzzle.js?v=20261124a"></script>
+<script src="js/hero.js?v=20261124a"></script>
+<script src="js/solver.js?v=20261124a"></script>
+<script src="js/methods.js?v=20261124a"></script>
+<script src="js/plans.js?v=20261124a"></script>
+<script src="js/keys.js?v=20261124a"></script>
+<script src="js/trainer.js?v=20261124a"></script>
+<script src="js/advisor.js?v=20261124a"></script>
+<script src="js/tables.js?v=20261124a"></script>
+<script src="js/views.js?v=20261124a"></script>
 
 </body>
 </html>

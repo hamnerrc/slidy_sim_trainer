@@ -202,11 +202,14 @@ button.btn.zdrill:disabled{opacity:.45;cursor:default;border-color:var(--line)}
 .zbar i{display:block;height:100%;width:0;background:var(--fb);border-radius:99px;transition:width .5s}
 .zen-progress span{font-variant-numeric:tabular-nums;text-align:right}
 @media (max-width:520px){.zen-progress{flex-direction:column;align-items:stretch;gap:6px}.zbar{flex:none}.zen-progress span{text-align:left}}
-.zpanel{position:absolute;top:62px;right:12px;bottom:12px;width:min(360px,calc(100% - 24px));background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:0 18px 50px rgba(0,0,0,.22);padding:16px;overflow-y:auto;display:grid;gap:14px;align-content:start;z-index:5}
 .zp-head{display:flex;justify-content:space-between;align-items:center}
 .zp-head h3{margin:0}
 label.zp-check{display:flex;align-items:center;gap:8px;color:var(--ink);font-size:.88rem}
 label.zp-check input{width:auto}
+label.zp-check[hidden]{display:none}
+.zpanel [hidden]{display:none!important}
+.zp-seqst{display:grid;gap:8px}
+.zp-seqst .zp-sub{margin:-2px 0 4px}
 .zp-row{color:var(--ink);font-size:.86rem}
 .zp-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(68px,1fr));gap:6px;width:100%}
 .zp-stats div{background:var(--sunk);border-radius:8px;padding:6px 8px;min-width:0}
@@ -292,8 +295,6 @@ label.zp-mini{display:flex;align-items:center;gap:6px;font-size:.84rem;color:var
 .zen-progress{padding-top:10px;border-top:1px solid var(--line)}
 
 /* settings panel */
-.zpanel{gap:0;padding:0;background:var(--surface);top:60px}
-.zp-head{position:sticky;top:0;z-index:1;background:var(--surface);padding:14px 16px 10px;border-bottom:1px solid var(--line)}
 .zp-head h3{font-family:var(--display);font-size:1rem}
 .zp-sec{display:grid;gap:8px;justify-items:stretch;padding:14px 16px;border-bottom:1px solid var(--line)}
 .zp-sec:last-child{border-bottom:0}
@@ -318,7 +319,6 @@ label.zp-check input[type=checkbox]:focus-visible{outline:2px solid var(--accent
 .zp-custom > *+*{margin-top:6px}
 .zp-danger{border-top:0}
 .zp-danger h4{color:var(--you)}
-@media (max-width:520px){.zpanel{top:8px;right:8px;bottom:8px;width:calc(100% - 16px)}}
 
 /* controls help */
 .zen-help{margin:14px auto 0;max-width:640px;text-align:left;font-size:.84rem;color:var(--muted)}
@@ -366,22 +366,84 @@ kbd{font-family:var(--mono);font-size:.72rem;padding:1px 6px;border-radius:5px;b
 .zen-live .zl-leg svg{height:14px;width:auto}
 .zen-live .zl-leg .zl-mh{margin-left:auto;text-transform:uppercase;letter-spacing:.04em;font-size:.6rem}
 .zen-live .zl-rows{display:grid;grid-template-columns:1fr 3.2em;gap:4px 8px;align-items:end}
-.zen-live .zl-rows svg{display:block;width:100%;height:auto;overflow:visible}
+.zen-live .zl-rows canvas{display:block;width:100%;height:auto;cursor:pointer;touch-action:manipulation}
 .zen-live .zl-rows > span{text-align:right;font-size:.66rem;line-height:1;color:var(--ink)}
 .zen-live .zl-rows > span.z0{color:var(--muted)}.zen-live .zl-rows > span.now{font-weight:600}
 .zen-live .track{fill:var(--line)}
 .zen-live .ok{fill:var(--fb);opacity:.55}
 .zen-live .bad{fill:var(--you)}
 .zen-live .hit{fill:transparent}
-.zen-live g:hover .ok{opacity:1}.zen-live g:hover .bad{fill:var(--ink)}
 .zen-live .zl-r small em{font-style:normal}
-.zen-live .zl-l{min-width:4.6em}
+.zen-live .zl-l{min-width:max-content}
 /* phone: accuracy and speed as two tables, a touch bigger type, the miss count and rate on separate lines */
-@media (max-width:680px){.zen-live{font-size:.78rem}.zen-live .zl-tab{gap:4px 14px;width:100%;justify-content:space-between}
+@media (max-width:680px){.zen-live{font-size:.78rem}.zen-live .zl-tab{gap:4px 9px;width:100%;justify-content:space-between}
   .zen-live .zl-r small em{display:none}.zen-live .zl-r small span{display:block}
   .zen-live .zl-rows{gap:5px 8px}.zen-live .zl-leg{font-size:.68rem}}
 /* fullscreen keeps the board as big as the screen allows; with stats on, they sit below it and the view scrolls to them
    (the board itself has touch-action:none, so sliding tiles never scrolls) */
 .zen.fs,.zen.pfs{overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
 .zen-live .zl-tip{margin:4px 0 0;min-height:1.2em;font-size:.68rem;color:var(--ink);text-align:center}
-.zen-live g.sel .ok{opacity:1}.zen-live g.sel .bad{fill:var(--ink)}.zen-live g{cursor:pointer}
+/* pick mode: row or column? */
+.zen-target .z-pick{font-family:var(--mono);font-size:.82rem;text-transform:none;letter-spacing:0;color:var(--ink);background:var(--sunk);border:1px solid var(--line);border-radius:8px;padding:7px 12px;cursor:pointer;display:inline-flex;align-items:center;gap:8px;touch-action:manipulation}
+.zen-target .z-pick:hover{border-color:var(--accent)}
+.zen-target .z-pick:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.zen-target .z-pick kbd{font-size:.7rem;color:var(--muted);background:none;border:0;padding:0}
+@media (max-width:520px){.zen-target{flex-wrap:wrap;justify-content:center;row-gap:6px}.zen-target .z-pick kbd,.zen-target .z-pq{display:none}}
+/* header: views + key bindings */
+.appbar-end{display:flex;align-items:center;gap:6px}
+#keysBtn{color:var(--muted)}
+/* key bindings dialog */
+.keysdlg{border:1px solid var(--line);border-radius:14px;background:var(--surface);color:var(--ink);padding:16px 18px;width:min(560px,calc(100vw - 24px));max-height:calc(100dvh - 40px);overflow:auto}
+.keysdlg::backdrop{background:rgba(0,0,0,.55)}
+.keysdlg .kd-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:6px}
+.keysdlg h3{margin:0;font-family:var(--display);font-size:1rem}
+.keysdlg .kd-list{list-style:none;margin:10px 0;padding:0;display:grid;gap:6px}
+.keysdlg .kd-list li{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:4px 10px;padding:6px 0;border-bottom:1px solid var(--line)}
+.keysdlg .kd-name{font-size:.86rem}
+.keysdlg .kd-keys{display:flex;flex-wrap:wrap;gap:5px;align-items:center}
+.keysdlg .kd-key{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--line);background:var(--sunk);color:var(--ink);border-radius:7px;padding:2px 6px;cursor:pointer;font:inherit}
+.keysdlg .kd-key span{color:var(--muted);font-size:.8rem}
+.keysdlg .kd-key:hover{border-color:var(--you)}.keysdlg .kd-key:hover span{color:var(--you)}
+.keysdlg .kd-key kbd{border:0;background:none;padding:0}
+.keysdlg .kd-add{border:1px dashed var(--line);background:none;color:var(--accent);border-radius:7px;padding:3px 8px;cursor:pointer;font-family:var(--mono);font-size:.74rem}
+.keysdlg .kd-add.on{border-style:solid;border-color:var(--accent);background:var(--sunk)}
+.keysdlg .kd-msg{min-height:1.2em}
+/* five trainer tabs: keep the toolbar on one line on phones */
+@media (max-width:420px){.zen-top .seg button{padding:6px 7px;font-size:.8rem}.zen-top{column-gap:0}}
+
+/* settings window: a sheet over the trainer with pages (works inside fullscreen too) */
+.zpanel{position:fixed;inset:0;z-index:80;background:rgba(0,0,0,.6);display:grid;place-items:center;padding:16px}
+.zp-sheet{width:min(820px,100%);height:min(660px,100%);background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:16px;box-shadow:0 24px 70px rgba(0,0,0,.45);
+  display:grid;grid-template-columns:184px minmax(0,1fr);grid-template-rows:auto minmax(0,1fr);overflow:hidden}
+.zp-head{grid-column:1/-1;display:flex;justify-content:space-between;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--line)}
+.zp-head h3{margin:0;font-family:var(--display);font-size:1rem}
+.zp-nav{display:flex;flex-direction:column;gap:2px;padding:12px 10px;border-right:1px solid var(--line);background:var(--sunk)}
+.zp-nav button{border:0;background:none;color:var(--muted);font:inherit;font-family:var(--mono);font-size:.84rem;text-align:left;padding:9px 12px;border-radius:9px;cursor:pointer}
+.zp-nav button:hover{color:var(--ink)}
+.zp-nav button[aria-current=page]{background:var(--surface);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.25)}
+.zp-nav button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.zp-body{overflow-y:auto;overscroll-behavior:contain;padding:4px 8px 16px}
+.zp-page{display:none;max-width:600px}
+.zp-page.on{display:block}
+.zp-page .zp-sec{padding:16px 14px}
+.zp-two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.zp-sec h4.zp-h5{margin-top:6px}
+.zp-seqst{display:grid;gap:10px}
+.zp-seqst .zp-stage{display:grid;gap:6px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--sunk)}
+.zp-seqst .zp-stage select{background:var(--surface)}
+@media (max-width:640px){
+  .zpanel{padding:0;place-items:stretch}
+  .zp-sheet{width:100%;height:100%;border-radius:0;border:0;grid-template-columns:minmax(0,1fr);grid-template-rows:auto auto minmax(0,1fr);
+    padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px)}
+  .zp-nav{flex-direction:row;overflow-x:auto;border-right:0;border-bottom:1px solid var(--line);padding:8px}
+  .zp-nav button{white-space:nowrap;padding:8px 6px;flex:1;text-align:center;font-size:.8rem}
+  .zp-two{grid-template-columns:1fr}}
+.zp-sec .note.zp-exp{color:var(--ink);background:var(--sunk);border-radius:8px;padding:8px 10px}
+.zp-sec .note.zp-exp:empty{display:none}
+.zen-live .zl-ideal{color:var(--fb)}.zen-live .zl-ideal small{color:var(--muted)}
+.zen-live .zl-mu{color:var(--line)}
+/* stats: the strip box (kept between updates) and the table box */
+.zen-live .zl-sbox{width:100%;display:flex;justify-content:center}
+.zen-live .zl-sbox:empty{display:none}
+.zen-live .zl-tbox{width:100%;display:flex;flex-direction:column;align-items:flex-start;gap:10px;min-width:0}
+.zen-live .zl-tbox > *{margin-inline:auto}

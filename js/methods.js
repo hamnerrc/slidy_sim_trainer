@@ -10,29 +10,23 @@ const METHODS=(function(){
       {id:"opt",name:"Full 3x2 optimal",steps:[{rest:1}],exp:"about 12.6 moves",desc:"The whole 3x2 at its optimum."},
       {id:"p1014",name:"10-14 pair, then the 2x2",steps:[{t:[10,14]},{rest:1}],exp:"about 13.1 moves",desc:"Place 10 and 14 optimally, then cycle the last three."}],
     "3x3":[
-      {id:"row",name:"Row 6-8, then 3x2 optimal",steps:[{t:[6,7,8]},{rest:1}],exp:"about 26.5 moves",desc:"Row 6-8 at its own optimum, then the optimal 3x2."},
-      {id:"col",name:"Column 6-10-14, then 3x2 optimal",steps:[{t:[6,10,14]},{rest:1}],exp:"about 26.4 moves",desc:"Column 6-10-14 at its own optimum, then the optimal 3x2."},
-      {id:"rowla",name:"Row 6-8 set up for the 3x2",steps:[{t:[6,7,8],la:{slack:0,next:{rest:1}}},{rest:1}],exp:"about 25.7 moves",desc:"The row is graded together with the 3x2 it leaves."},
-      {id:"colla",name:"Column 6-10-14 set up for the 3x2",steps:[{t:[6,10,14],la:{slack:0,next:{rest:1}}},{rest:1}],exp:"about 25.8 moves",desc:"The column is graded together with the 3x2 it leaves."},
-      {id:"either",name:"Row or column, whichever is better",steps:[{alts:[[6,7,8],[6,10,14]],la:{slack:0,next:{rest:1}}},{rest:1}],exp:"about 24.0 moves (50% of cases optimal)",desc:"Pick row or column per case. Graded on the better total."},
+      {id:"rowo",name:"Row 6-8 optimal",steps:[{t:[6,7,8]}],exp:"about 14.1 moves",desc:"Row 6-8 at its own optimum. The 3x2 it leaves is the 3x2 trainer's job."},
+      {id:"colo",name:"Column 6-10-14 optimal",steps:[{t:[6,10,14]}],exp:"about 14.1 moves",desc:"Column 6-10-14 at its own optimum. The 2x3 it leaves is the 3x2 trainer's job."},
+      {id:"rowla1",name:"Row 6-8 set up for the 3x2",steps:[{t:[6,7,8],la:{slack:0,next:{rest:1}}}],exp:"about 25.7 moves for the row and the 3x2 it leaves",desc:"You build the row; it is graded together with the optimal 3x2 it leaves."},
+      {id:"colla1",name:"Column 6-10-14 set up for the 2x3",steps:[{t:[6,10,14],la:{slack:0,next:{rest:1}}}],exp:"about 25.8 moves for the column and the 2x3 it leaves",desc:"You build the column; it is graded together with the optimal 2x3 it leaves."},
       {id:"open8",name:"Opening: first 8 moves optimal",steps:[{rest:1,prefix:8}],exp:"8 moves per case",desc:"Only the first 8 moves count. A wrong move ends the case at once."},
       {id:"opt",name:"Full 3x3 optimal",steps:[{rest:1}],exp:"about 22.0 moves",desc:"The whole 3x3 at its optimum: the top standard."}],
     "4x3":[
       {id:"pair",name:"5, then 9-13 pair",steps:[{t:[5]},{t:[9,13]}],exp:"about 24.0 moves for the column",desc:"Tile 5 first, then 9 and 13 together."},
       {id:"col",name:"Column 5-9-13 optimal",steps:[{t:[5,9,13]}],exp:"about 19.0 moves",desc:"The column as one step at its optimum."},
       {id:"colla",name:"Column set up for the 3x3",steps:[{t:[5,9,13],la:{slack:0,next:{rest:1}}}],exp:"about 19 moves for the column, 39.8 with the 3x3",desc:"An optimal column, graded on the 3x3 it leaves."},
-      {id:"colla2",name:"Column set up for the 3x3, up to +2",steps:[{t:[5,9,13],la:{slack:2,next:{rest:1}}}],exp:"about 20 moves for the column, 38.0 with the 3x3",desc:"The column may spend 2 extra moves to force a better 3x3."},
-      {id:"colfull",name:"Column, then 3x3 optimal",steps:[{t:[5,9,13]},{rest:1}],exp:"about 40.9 moves",desc:"Optimal column, then solve the optimal 3x3 too."}],
+      {id:"colla2",name:"Column set up for the 3x3, up to +2",steps:[{t:[5,9,13],la:{slack:2,next:{rest:1}}}],exp:"about 20 moves for the column, 38.0 with the 3x3",desc:"The column may spend 2 extra moves to force a better 3x3."}],
     "4x4":[
       {id:"single",name:"1, then 2, then 3-4 pair",steps:[{t:[1]},{t:[2]},{t:[3,4]}],exp:"about 38.5 moves for row 1",desc:"One tile at a time, last pair together."},
       {id:"pairs",name:"1-2 pair, then 3-4 pair",steps:[{t:[1,2]},{t:[3,4]}],exp:"about 35.5 moves for row 1",desc:"Two pairs, each at its optimum."},
       {id:"row",name:"Row 1 optimal",steps:[{t:[1,2,3,4]}],exp:"about 26.9 moves",desc:"Row 1 as one step at its optimum."},
       {id:"rowla",name:"Row 1 set up for column 5-9-13",steps:[{t:[1,2,3,4],la:{slack:0,next:{t:[5,9,13]}}}],exp:"about 26.9 moves for the row, 44.1 with column 5-9-13",desc:"An optimal row, graded on the column it leaves."},
-      {id:"r5",name:"Row 1, then 5, then 9-13",steps:[{t:[1,2,3,4]},{t:[5]},{t:[9,13]}],exp:"about 51.2 moves for the first L",desc:"Row 1, then the first column as 5 and a pair."},
-      {id:"r13",name:"Row 1, then 13, then 5-9",steps:[{t:[1,2,3,4]},{t:[13]},{t:[5,9]}],exp:"about 51.1 moves for the first L",desc:"Row 1, then 13 to the corner and 5-9 between."},
-      {id:"col",name:"Column 1-5-9-13 optimal",steps:[{t:[1,5,9,13]}],exp:"about 26.7 moves",desc:"The first column as one step at its optimum."},
-      {id:"c2",name:"1-5-9-13, then 2, then 3-4",steps:[{t:[1,5,9,13]},{t:[2]},{t:[3,4]}],exp:"about 50.6 moves for the first L",desc:"Column first, then the row as 2 and a pair."},
-      {id:"c4",name:"1-5-9-13, then 4, then 2-3",steps:[{t:[1,5,9,13]},{t:[4]},{t:[2,3]}],exp:"about 50.8 moves for the first L",desc:"Column first, then 4 to the corner and 2-3 between."}]};
+      {id:"col",name:"Column 1-5-9-13 optimal",steps:[{t:[1,5,9,13]}],exp:"about 26.7 moves",desc:"The first column as one step at its optimum."}]};
 
   const loc=(key,lab)=>PUZ[key].labels.indexOf(lab)+1;     // label -> tile number on this board
   const lab=(key,v)=>PUZ[key].labels[v-1];
@@ -42,19 +36,22 @@ const METHODS=(function(){
   const PAT={};
   function nbWalls(w,h,W){const r=[];for(let z=0;z<w*h;z++){const x=z%w,y=(z/w)|0,a=[];
       if(y>0)a.push(z-w);if(y<h-1)a.push(z+w);if(x>0)a.push(z-1);if(x<w-1)a.push(z+1);r.push(a.filter(c=>!W[c]))}return r}
-  function pattern(key,tiles,walls){const id=key+"|"+tiles.join(",")+"|"+walls.slice().sort((a,b)=>a-b).join(",");if(PAT[id])return PAT[id];
+  const patId=(key,tiles,walls)=>key+"|"+tiles.join(",")+"|"+walls.slice().sort((a,b)=>a-b).join(",");
+  const pattern=(key,tiles,walls)=>PAT[patId(key,tiles,walls)]||run(patternG(key,tiles,walls));
+  /* building a table is a breadth-first pass over every position; this version pauses every few thousand positions */
+  function* patternG(key,tiles,walls){const id=patId(key,tiles,walls);if(PAT[id])return PAT[id];
     const {w,h}=PUZ[key],n=w*h,k=tiles.length,W=new Uint8Array(n);walls.forEach(c=>W[c]=1);
     const NB=nbWalls(w,h,W),st=[];for(let j=0;j<k;j++)st.push(n**(j+1));const size=n**(k+1);
     if(size>(1<<24))throw new Error("step too large");
     const D=new Uint8Array(size).fill(255),Q=new Int32Array(size),hm=tiles.map(home),pos=new Int32Array(k);
     let base=0;hm.forEach((c,j)=>{base+=c*st[j]});let qh=0,qt=0,max=0;
     for(let g=0;g<n;g++)if(!W[g]&&!hm.includes(g)){D[base+g]=0;Q[qt++]=base+g}
-    while(qh<qt){const s=Q[qh++],d=D[s];let x=(s/n)|0;const g=s-x*n;
+    while(qh<qt){if((qh&4095)===0)yield;const s=Q[qh++],d=D[s];let x=(s/n)|0;const g=s-x*n;
       for(let j=0;j<k;j++){pos[j]=x%n;x=(x/n)|0}
       const nb=NB[g];for(let q=0;q<nb.length;q++){const c=nb[q];let t=s-g+c;
         for(let j=0;j<k;j++)if(pos[j]===c){t+=(g-c)*st[j];break}
         if(D[t]===255){D[t]=d+1;Q[qt++]=t;if(d+1>max)max=d+1}}}
-    const hist=new Array(max+1).fill(0);for(let i=0;i<size;i++)if(D[i]!==255)hist[D[i]]++;
+    const hist=new Array(max+1).fill(0);for(let i=0;i<size;i++){if((i&65535)===0)yield;if(D[i]!==255)hist[D[i]]++}
     const P={key,tiles,walls,n,k,st,D,NB,max,hist,
       code(b){let s=b.indexOf(0);for(let j=0;j<k;j++)s+=b.indexOf(tiles[j])*st[j];return s},
       dist(b){const v=D[P.code(b)];return v===255?Infinity:v}};
@@ -71,13 +68,19 @@ const METHODS=(function(){
         return{sk,R,dist(b){let s="";for(let j=0;j<R.length;j++){const v=b[R[j]];s+=v?inv.get(home(v))+1:0}const d=table(sk).dist.get(s);return d==null?Infinity:d}}}}
     return null}
 
+  /* build, pausably, the tables a step will use from these walls, so resolving it afterwards costs nothing */
+  function* ensureG(key,spec,walls){const n=PUZ[key].w*PUZ[key].h,W=new Set(walls);
+    if(spec.rest){const R=region(key,walls);if(R){table(R.sk);return}const tiles=[];for(let v=1;v<n;v++)if(!W.has(home(v)))tiles.push(v);yield* patternG(key,tiles,walls);return}
+    for(const g of (spec.alts||[spec.t]))yield* patternG(key,g.map(l=>loc(key,l)).sort((x,y)=>x-y),walls);
+    if(spec.la)for(const g of (spec.alts||[spec.t]))yield* ensureG(key,spec.la.next,walls.concat(g.map(l=>home(loc(key,l)))))}
   /* ---------- runtime step: resolve a step spec against the tiles already placed ---------- */
   function resolve(key,spec,walls){const n=PUZ[key].w*PUZ[key].h,W=new Set(walls);
     if(spec.rest){const tiles=[];for(let v=1;v<n;v++)if(!W.has(home(v)))tiles.push(v);
       const R=region(key,walls);let f;
       if(R)f=R.dist;else{const P=pattern(key,tiles,walls);f=P.dist}
       return{spec,alts:[tiles],f,rest:true,tiles,exact:!!R&&walls.length===0}}
-    const alts=(spec.alts||[spec.t]).map(g=>g.map(l=>loc(key,l))),pats=alts.map(a=>pattern(key,a,walls));
+    // groups are sorted so the same tiles always share one table, whatever order a method (or a merge) lists them in
+    const alts=(spec.alts||[spec.t]).map(g=>g.map(l=>loc(key,l)).sort((x,y)=>x-y)),pats=alts.map(a=>pattern(key,a,walls));
     return{spec,alts,pats,tiles:[...new Set(alts.flat())],f:b=>Math.min(...pats.map(p=>p.dist(b)))}}
   const altDone=(R,b)=>R.alts.findIndex(a=>a.every(v=>b[home(v)]===v));
   function doneStep(R,b){if(R.rest)return solved(b);return altDone(R,b)>=0}
@@ -89,23 +92,39 @@ const METHODS=(function(){
   /* value of the next step after this one finishes on board b */
   function nextVal(key,R,b,walls){const sp=R.spec.la.next,W2=wallsAfter(R,b,walls);return resolve(key,sp,W2).f(b)}
   /* Best achievable (step moves + optimal next step), using at most `limit` step moves. Returns {v,path}. */
-  function lookahead(key,R,walls,b,limit,budget,fp){const {w}=PUZ[key];let best=Infinity,bestPath="",nodes=0;const memo=new Map(),path=[],F=fp||R.f;
-    const B=b.slice();
-    (function go(g,prev){const h=F(B);if(g+h>limit||++nodes>budget)return;
-      if(h===0||altDone(R,B)>=0){const v=g+nextVal(key,R,B,walls);if(v<best){best=v;bestPath=path.join("")}return}
-      const k=B.join(","),m=memo.get(k);if(m!==undefined&&m<=g)return;memo.set(k,g);
-      const z=B.indexOf(0);for(const c of moveList(key,B,walls)){if(c===prev)continue;
-        B[z]=B[c];B[c]=0;path.push(tileLetter(z,c,w));go(g+1,z);path.pop();B[c]=B[z];B[z]=0}})(0,-1);
+  /* The searches below are written to pause: they yield every few hundred positions, so the trainer can spread one
+     over many short slices and never hold up a frame. run() finishes one at once for callers that need the answer now. */
+  function run(g){let r;while(!(r=g.next()).done);return r.value}
+  /* Best achievable (step moves + optimal next step), using at most `limit` step moves. Returns {v,path,cut}.
+     Depth-first with an explicit stack (so it can pause), memo of the fewest moves each position was reached in. */
+  function* lookaheadG(key,R,walls,b,limit,budget,fp){const {w}=PUZ[key];let best=Infinity,bestPath="",nodes=0,tick=0;const memo=new Map(),path=[],F=fp||R.f,B=b.slice(),stack=[];
+    // memo key: the tiles on the free cells packed 4 bits each (a number, so no string per position) when they fit
+    const Wset=new Set(walls),free=[];for(let c=0;c<B.length;c++)if(!Wset.has(c))free.push(c);free.pop();
+    const keyOf=free.length<=13?()=>{let k=0;for(let i=0;i<free.length;i++)k=k*16+B[free[i]];return k}:()=>B.join(",");
+    const enter=(g,prev)=>{const h=F(B);if(g+h>limit||++nodes>budget)return null;
+      if(h===0||altDone(R,B)>=0){const v=g+nextVal(key,R,B,walls);if(v<best){best=v;bestPath=path.join("")}return null}
+      const k=keyOf(),m=memo.get(k);if(m!==undefined&&m<=g)return null;memo.set(k,g);
+      return{g,prev,z:B.indexOf(0),mv:moveList(key,B,walls),i:0,u:-1}};
+    const f0=enter(0,-1);if(f0)stack.push(f0);
+    while(stack.length){if(++tick>=48){tick=0;yield}
+      const t=stack[stack.length-1];
+      if(t.u>=0){const c=t.u;B[c]=B[t.z];B[t.z]=0;path.pop();t.u=-1}
+      if(t.i>=t.mv.length){stack.pop();continue}
+      const c=t.mv[t.i++];if(c===t.prev)continue;
+      B[t.z]=B[c];B[c]=0;path.push(tileLetter(t.z,c,w));
+      const ch=enter(t.g+1,t.z);if(ch){t.u=c;stack.push(ch)}else{B[c]=B[t.z];B[t.z]=0;path.pop()}}
     return{v:best,path:bestPath,cut:nodes>budget}}
   const BUDGET=400000;
   /* standard for a step from board b: {std, limit} */
   /* Set-up steps: each alternative group may use up to its own optimum + slack moves. */
-  function laBest(key,R,walls,b,lims,used,budget){let best={v:Infinity,path:"",cut:false};
-    (R.pats||[{dist:R.f}]).forEach((p,a)=>{const lim=lims[a]-used;if(lim<0)return;const r=lookahead(key,R,walls,b,lim,budget,p.dist);if(r.cut)best.cut=true;if(r.v<best.v)best={v:r.v,path:r.path,cut:best.cut}});
+  function* laBestG(key,R,walls,b,lims,used,budget){let best={v:Infinity,path:"",cut:false};const pats=R.pats||[{dist:R.f}];
+    for(let a=0;a<pats.length;a++){const lim=lims[a]-used;if(lim<0)continue;const r=yield* lookaheadG(key,R,walls,b,lim,budget,pats[a].dist);if(r.cut)best.cut=true;if(r.v<best.v)best={v:r.v,path:r.path,cut:best.cut}}
     return best}
-  function standard(key,R,walls,b){const d=R.f(b);
+  const laBest=(...a)=>run(laBestG(...a));
+  function* standardG(key,R,walls,b){if(R.spec.la)yield* ensureG(key,R.spec,walls);const d=R.f(b);
     if(!R.spec.la)return{std:d,d};
-    const lims=(R.pats||[{dist:R.f}]).map(p=>p.dist(b)+R.spec.la.slack),r=laBest(key,R,walls,b,lims,0,BUDGET);return{std:r.v,d,lims,path:r.path}}
+    const lims=(R.pats||[{dist:R.f}]).map(p=>p.dist(b)+R.spec.la.slack),r=yield* laBestG(key,R,walls,b,lims,0,BUDGET);return{std:r.v,d,lims,path:r.path}}
+  const standard=(key,R,walls,b)=>run(standardG(key,R,walls,b));
   /* value of what the solver did: step moves (+ next step optimum for set-up steps) */
   function value(key,R,walls,bEnd,moves){return R.spec.la?moves+nextVal(key,R,bEnd,walls):moves}
   /* optimal continuation for a plain step from board b */
@@ -165,11 +184,48 @@ const METHODS=(function(){
     for(let t=0;t<4000;t++){const b=fillBoard(key,[],null),d=R.f(b);if(d>=lo&&d<=hi&&!solved(b))return b}
     return null}
 
+  /* ---------- the best total a list of steps allows ----------
+     Every step at its own optimum, but a step's optimal solutions can leave different boards; the best total takes
+     the one that makes the following steps cheapest. Exact search over each step's optimal paths, with states
+     projected onto the tiles still to come; a node budget caps it (cut:true when hit). Returns {v, path, cut}. */
+  function* chainBestG(key,steps,walls,b,budget){budget=budget||300000;const {w,h}=PUZ[key],n=w*h,memo=new Map();let nodes=0,cut=false,tick=0;
+    const tilesOf=(sp,W)=>{if(sp.rest){const Ws=new Set(W),r=[];for(let v=1;v<n;v++)if(!Ws.has(home(v)))r.push(v);return r}return (sp.alts||[sp.t]).flat().map(l=>loc(key,l))};
+    function* best(i,B,W){yield* ensureG(key,steps[i],W);const R=resolve(key,steps[i],W),d=R.f(B);if(!Number.isFinite(d))return{v:Infinity,path:""};
+      if(i===steps.length-1){if(steps[i].la){const s=yield* standardG(key,R,W,B);return{v:s.std,path:s.path||""}}return{v:d,path:descend(key,R,W,B)}}
+      const rel=[...new Set(steps.slice(i).flatMap(sp=>tilesOf(sp,W)))],proj=rel.length<12?X=>{let s=X.indexOf(0);for(const t of rel)s=s*16+X.indexOf(t);return s}:X=>{let s=X.indexOf(0)+":";for(const t of rel)s+=X.indexOf(t)+",";return s};
+      const id=i+"|"+W.join(".")+"|"+proj(B);if(memo.has(id))return memo.get(id);
+      let m={v:Infinity,path:""};const seen=new Set(),X=B.slice(),path=[],stack=[];
+      // every optimal path of step i (each move lowers its distance by one), as an explicit stack so it can pause
+      const enter=()=>{if(cut)return null;if(++nodes>budget){cut=true;return null}
+        const hh=R.f(X);if(hh===0||altDone(R,X)>=0)return{leaf:true};
+        const k=proj(X);if(seen.has(k))return null;seen.add(k);return{hh,z:X.indexOf(0),mv:moveList(key,X,W),i:0,u:-1}};
+      const leaf=function*(){const r=yield* best(i+1,X.slice(),wallsAfter(R,X,W));if(r.v<m.v)m={v:r.v,path:path.join("")+r.path}};
+      const f0=enter();if(f0&&f0.leaf)yield* leaf();else if(f0)stack.push(f0);
+      while(stack.length){if(++tick>=48){tick=0;yield}
+        const t=stack[stack.length-1];
+        if(t.u>=0){const c=t.u;X[c]=X[t.z];X[t.z]=0;path.pop();t.u=-1}
+        if(t.i>=t.mv.length){stack.pop();continue}
+        const c=t.mv[t.i++];X[t.z]=X[c];X[c]=0;
+        if(R.f(X)===t.hh-1){path.push(tileLetter(t.z,c,w));const ch=enter();
+          if(ch&&ch.leaf){yield* leaf();path.pop();X[c]=X[t.z];X[t.z]=0}
+          else if(ch){t.u=c;stack.push(ch)}else{path.pop();X[c]=X[t.z];X[t.z]=0}}
+        else{X[c]=X[t.z];X[t.z]=0}}
+      const r={v:d+m.v,path:m.path};memo.set(id,r);return r}
+    const r=yield* best(0,b,walls);return{v:r.v,path:r.path,cut}}
+  const chainBest=(...a)=>run(chainBestG(...a));
+
+  /* ---------- bigger steps: several consecutive steps graded as one ----------
+     merge(steps) is one step placing all their tiles (the rest when the last one is the rest), or null when a step
+     can't be merged (alternatives, opening prefixes). mergeable says whether its exact table is small enough to build
+     on the fly: the rest only as an exact 3x2 / 3x3 region, a tile group up to n^(k+1) <= 2^21 entries. */
+  function merge(steps){if(steps.some(s=>s.alts||s.prefix))return null;const last=steps[steps.length-1];
+    if(last.rest)return{rest:1};const t=[];steps.forEach(s=>t.push(...s.t));const m={t};if(last.la)m.la=last.la;return m}
+  function mergeable(key,spec,walls){const {w,h}=PUZ[key],n=w*h;if(spec.rest)return!!region(key,walls);return n**(spec.t.length+1)<=(1<<21)}
   function list(key,custom){return PRESETS[key].concat(custom||[])}
   function depthInfo(key,M){const R=resolve(key,M.steps[0],[]);
     if(R.exact)return{max:table(key).max,name:"whole puzzle"};
     if(R.pats&&R.pats.length===1)return{max:R.pats[0].max,name:stepName(key,M.steps[0])};
     return{max:Math.max(...R.pats.map(p=>p.max)),name:stepName(key,M.steps[0])}}
   function stepName(key,s){if(s.rest)return s.prefix?`first ${s.prefix} moves`:"the rest";if(s.alts)return s.alts.map(a=>a.join("-")).join(" or ");return s.t.join("-")}
-  return{PRESETS,list,resolve,doneStep,wallsAfter,standard,value,diverge,parse,sampleFirst,fillBoard,depthInfo,stepName,altDone,pattern,loc,lab,home}
+  return{PRESETS,list,resolve,doneStep,wallsAfter,standard,value,diverge,descend,chainBest,chainBestG,standardG,ensureG,run,merge,mergeable,parse,sampleFirst,fillBoard,depthInfo,stepName,altDone,pattern,loc,lab,home}
 })();
