@@ -171,22 +171,47 @@ const ZEN=(function(){
   function tick(){if(!C.running)return;setSub();requestAnimationFrame(tick)}
   const fb=h=>{fbEl.innerHTML=h};
   function lockAnim(ms){lockEl.style.transition="none";lockEl.style.width=ms?"100%":"0";void lockEl.offsetWidth;if(ms){lockEl.style.transition=`width ${ms}ms linear`;lockEl.style.width="0"}}
-  /* Stats over a list of solves. "over" is moves minus each case's own standard, per solve, so a run of hard
-     (deep) cases doesn't inflate it; "opt" is the mean standard of those same cases. With trim (csTimer / Slidysim
-     style aoN) the best and worst 5% of each figure are dropped (one each for ao5 and ao12); otherwise a plain mean. */
+  /* Stats over a list of solves, in terms a solver thinks in. "clean" = solves that met the method's standard (or beat
+     it); a miss is any other solve, and its "extra" is the moves it went over the standard, so hard (deep) cases never
+     count against you. Clean and extra are never trimmed: misses are rare, and trimming would throw away exactly the
+     solves that matter. Moves and time are trimmed csTimer / Slidysim style for aoN (best and worst 5% dropped, one
+     each for ao5 and ao12); "opt" is the mean standard of the same cases. */
   const stdOf=x=>x.s!=null?x.s:x.o;
+  const overOf=x=>stdOf(x)==null?null:(x.v!=null?x.v:x.m)-stdOf(x);
+  const okOf=x=>x.p!=null?!!x.p:overOf(x)!=null&&overOf(x)<=0;
   function tmean(a,trim){if(!a.length)return NaN;if(!trim||a.length<3)return a.reduce((x,y)=>x+y,0)/a.length;
     const c=Math.max(1,Math.ceil(a.length*.05)),b=a.slice().sort((x,y)=>x-y).slice(c,a.length-c);return b.reduce((x,y)=>x+y,0)/b.length}
   function stats(h,trim){const n=h.length;if(!n)return null;
-    const g=h.filter(x=>stdOf(x)!=null),ov=g.map(x=>(x.v!=null?x.v:x.m)-stdOf(x)),mo=ov.length?ov.reduce((a,b)=>a+b,0)/ov.length:NaN;
+    const g=h.filter(x=>stdOf(x)!=null),ms=h.filter(x=>!okOf(x)),extra=ms.reduce((a,x)=>a+Math.max(0,overOf(x)||0),0);
     const t=tmean(h.map(x=>x.t),trim),m=tmean(h.map(x=>x.m),trim);
-    return{n,t,m,opt:g.length?g.reduce((a,x)=>a+stdOf(x),0)/g.length:NaN,o:tmean(ov,trim),sd:ov.length>1?Math.sqrt(ov.reduce((a,b)=>a+(b-mo)**2,0)/(ov.length-1)):NaN,tps:t?m/t:NaN}}
-  /* best aoN moves and time anywhere in the saved history, cached per history length */
+    return{n,t,m,opt:g.length?g.reduce((a,x)=>a+stdOf(x),0)/g.length:NaN,clean:n-ms.length,miss:ms.length,extra,tps:t?m/t:NaN}}
+  /* clean share as a percent that never rounds a miss away: 997 / 1000 is 99.7%, never 100% */
+  function pct(c,n){if(!n)return"—";if(c===n)return"100%";const v=c/n*100;return(v>=99?Math.floor(v*10)/10:Math.floor(v))+"%"}
+  /* best aoN moves, time and clean count anywhere in the saved history, cached per history length */
   let bestC={};
   function bestAo(S,h,w){const id=S.hk+"|"+w+"|"+h.length+"|"+(h.length&&h[h.length-1].t);if(bestC[id])return bestC[id];
-    let bm=Infinity,bt=Infinity;for(let i=w;i<=h.length;i++){const a=h.slice(i-w,i);bm=Math.min(bm,w===1?a[0].m:tmean(a.map(x=>x.m),1));bt=Math.min(bt,w===1?a[0].t:tmean(a.map(x=>x.t),1))}
-    return bestC[id]={m:bm,t:bt}}
-  /* stats table under the board: last solve, ao5 … ao1000 as the history allows, and this session's mean */
+    let bm=Infinity,bt=Infinity,bc=-1;const ps=[0];h.forEach(x=>ps.push(ps[ps.length-1]+(okOf(x)?1:0)));
+    for(let i=w;i<=h.length;i++){const a=h.slice(i-w,i);bm=Math.min(bm,w===1?a[0].m:tmean(a.map(x=>x.m),1));bt=Math.min(bt,w===1?a[0].t:tmean(a.map(x=>x.t),1));bc=Math.max(bc,ps[i]-ps[i-w])}
+    return bestC[id]={m:bm,t:bt,c:bc}}
+  /* every saved solve as one mark, 100 per row (50 on a phone, so the marks stay big enough to see), the newest at
+     the bottom right, so each row is one ao100 (or ao50). A clean solve is a small dot on the baseline; a miss is a
+     bar whose height grows with its extra moves (1, 2, 3, 4+), so a single slip in hundreds of solves stands out,
+     and a bad run still reads as a wall of bars. */
+  const narrowQ=window.matchMedia("(max-width:680px)");
+  function strip(h,per){const n=h.length,R=Math.ceil(n/per),out=[];
+    for(let r=0;r<R;r++){const end=n-(R-1-r)*per;let marks="",k=0;
+      for(let j=0;j<per;j++){const i=end-per+j;if(i<0)continue;const x=h[i],ok=okOf(x),o=overOf(x),ago=n-1-i;
+        const tip=`${ago?ago+" solve"+(ago>1?"s":"")+" ago":"latest solve"} · ${ok?(o!=null&&o<0?`beat the standard by ${-o}`:"clean"):`missed${o>0?` · +${o} over the standard`:""}`} · ${fmt(x.t,2)} s`;
+        let mk;if(ok)mk=`<circle class="ok" cx="${j*10+5}" cy="20" r="2.4"/>`;
+        else{k++;const e=Math.min(4,Math.max(1,o||1)),ht=7+4*(e-1);mk=`<rect class="bad" x="${j*10+1}" y="${23-ht}" width="8" height="${ht}" rx="1.5"/>`}
+        marks+=`<g data-tip="${tip}">${mk}<rect class="hit" x="${j*10}" y="0" width="10" height="24"><title>${tip}</title></rect></g>`}
+      const cnt=Math.min(per,end);
+      out.push(`<svg viewBox="0 0 ${per*10} 24" role="img" aria-label="${cnt} solves, ${k} missed"><rect class="track" x="0" y="23" width="${per*10}" height="1"/>${marks}</svg>`+
+        `<span class="${k?"":"z0"}${r===R-1?" now":""}">${k}</span>`)}
+    return `<div class="zl-viz"><div class="zl-leg"><span><svg viewBox="0 0 10 24" aria-hidden="true"><circle class="ok" cx="5" cy="20" r="2.4"/></svg>clean</span>`+
+      `<span><svg viewBox="0 0 30 24" aria-hidden="true"><rect class="bad" x="1" y="16" width="8" height="7" rx="1.5"/><rect class="bad" x="11" y="12" width="8" height="11" rx="1.5"/><rect class="bad" x="21" y="4" width="8" height="19" rx="1.5"/></svg>missed: +1 · +2 · +4 or more</span>`+
+      `<span class="zl-sub">${per} per row, newest bottom right</span><span class="zl-mh">misses</span></div><div class="zl-rows">${out.join("")}</div><p class="zl-tip" aria-live="polite"></p></div>`}
+  /* stats under the board: the strip of every solve, then last solve, ao5 … ao1000 as the history allows, and this session */
   const WIN=[5,12,50,100,200,500,1000];
   function liveUI(){const el=$("zLive"),b=$("zStatBtn");b.setAttribute("aria-pressed",ui.stats?"true":"false");b.classList.toggle("on",ui.stats);
     const l=ui.stats?"Hide stats (T)":"Show stats (T)";b.setAttribute("aria-label",l);b.title=l;
@@ -195,21 +220,36 @@ const ZEN=(function(){
     if(!n){el.innerHTML='<p class="zl-none">no solves yet with this method</p>';return}
     const rows=[["last",1,1]];WIN.forEach(w=>{if(n>=w)rows.push(["ao"+w,w,1])});
     const sn=Math.min(S.sess||0,n);if(sn>1)rows.push(["session",sn,0]);
-    // change from the same figure one solve earlier (lower is better for moves, over and time)
+    // change from the same figure one solve earlier: lower is better for moves and time, higher for clean
     const dl=(a,p,k)=>{if(!p||!isFinite(a[k])||!isFinite(p[k]))return"";const d=a[k]-p[k];if(Math.abs(d)<.005)return"";return `<i class="${d<0?"dn":"up"}">${d<0?"▼":"▲"}${fmt(Math.abs(d),2)}</i>`};
+    const dc=(a,p)=>{if(!p)return"";const d=a.clean/a.n-p.clean/p.n;if(Math.abs(d)<1e-9)return"";const v=Math.abs(d)*100;return `<i class="${d>0?"dn":"up"}">${d>0?"▲":"▼"}${v<1?fmt(v,1):Math.round(v)}</i>`};
     const pb=(v,cur)=>isFinite(v)?`<small class="${cur<=v+1e-9?"pb":""}">${cur<=v+1e-9?"PB":"best "+fmt(v,2)}</small>`:"";
-    const head=`<div class="zl-h"><span>${n} solve${n>1?"s":""}</span><span>moves</span><span>optimal</span><span>over</span><span>σ</span><span>time</span><span>tps</span></div>`;
-    el.innerHTML=head+rows.map(([lab,w,trim])=>{const a=stats(h.slice(-w),trim),sess=lab==="session",last=w===1&&!sess;
-      const p=sess?stats(h.slice(-w,-1),0):last?null:n>w?stats(h.slice(-w-1,-1),trim):null,bst=sess?null:bestAo(S,h,w);
-      return `<div class="zl-r"><span class="zl-l">${sess?`session <small>${w} mean</small>`:lab}</span>`+
-        `<span><b>${fmt(a.m,last?0:2)}</b>${dl(a,p,"m")}${bst&&n>w?pb(bst.m,a.m):""}</span>`+
-        `<span>${fmt(a.opt,last?0:2)}</span>`+
-        `<span><b>${isFinite(a.o)?"+"+fmt(a.o,last?0:2):"—"}</b>${dl(a,p,"o")}</span>`+
-        `<span>${!last&&isFinite(a.sd)?"±"+fmt(a.sd,1):""}</span>`+
-        `<span>${fmt(a.t,2)}${dl(a,p,"t")}${bst&&n>w?pb(bst.t,a.t):""}</span>`+
-        `<span>${fmt(a.tps,1)}</span></div>`}).join("")+
-      `<p class="zl-note">aoN drops the best and worst 5% (1 each for ao5 / ao12) · over = moves − each case's optimal, so hard cases don't count against you · σ = spread of over</p>`}
+    const cells=rows.map(([lab,w,trim])=>{const a=stats(h.slice(-w),trim),sess=lab==="session",last=w===1&&!sess;
+      const p=sess?stats(h.slice(-w,-1),0):last?null:n>w?stats(h.slice(-w-1,-1),trim):null,bst=sess||last?null:bestAo(S,h,w);
+      let cl,ex;
+      if(last){const o=overOf(h[n-1]);cl=a.miss?`<b class="zl-bad">✗ missed</b>`:`<b class="zl-ok">✓</b>`;ex=a.miss?(o>0?`<b>+${o}</b>`:`<b>—</b><small>left the path</small>`):(o!=null&&o<0?`<b>${o}</b><small>beat it</small>`:"0")}
+      else{cl=`<b class="${a.miss?"":"zl-ok"}">${pct(a.clean,a.n)}</b>${dc(a,p)}`+
+          (a.miss?`<small>${a.miss} missed<em> · </em><span>1 in ${a.n/a.miss<10?fmt(a.n/a.miss,1):Math.round(a.n/a.miss)}</span></small>`:"")+
+          (bst&&n>w&&a.miss?`<small class="${a.clean>=bst.c?"pb":""}">${a.clean>=bst.c?"PB":"best "+pct(bst.c,w)}</small>`:"");
+        ex=a.extra?`<b>+${a.extra}</b><small>+${fmt(a.extra/a.miss,1)} per miss</small>`:"0"}
+      return[`<span class="zl-l">${sess?`session <small>${w} solves</small>`:lab}</span>`,`<span>${cl}</span>`,`<span>${ex}</span>`,
+        `<span><b>${fmt(a.m,last?0:2)}</b>${dl(a,p,"m")}${bst&&n>w?pb(bst.m,a.m):""}</span>`,
+        `<span>${fmt(a.opt,last?0:2)}</span>`,
+        `<span>${fmt(a.t,2)}${dl(a,p,"t")}${bst&&n>w?pb(bst.t,a.t):""}</span>`,
+        `<span>${fmt(a.tps,1)}</span>`]});
+    // one table on wide screens; on a phone, accuracy and speed as two narrower tables so nothing scrolls sideways
+    const H=[`${n} solve${n>1?"s":""}`,"clean","extra moves","moves","optimal","time","tps"];
+    const table=(cols,cls)=>`<div class="zl-tab ${cls}" style="grid-template-columns:auto repeat(${cols.length-1},auto)"><div class="zl-h">${cols.map(c=>`<span>${H[c]}</span>`).join("")}</div>`+
+      cells.map(r=>`<div class="zl-r">${cols.map(c=>r[c]).join("")}</div>`).join("")+`</div>`;
+    const narrow=narrowQ.matches;
+    el.innerHTML=strip(h,narrow?50:100)+(narrow?table([0,1,2],"acc")+table([0,3,4,5,6],"spd"):table([0,1,2,3,4,5,6],"all"))+
+      `<p class="zl-note">clean = met the method's standard · extra moves = total moves over the standard in the misses, so hard cases never count against you · moves and time in aoN drop the best and worst 5% (1 each for ao5 / ao12); clean and extra moves count every solve</p>`}
   function setStats(on){ui.stats=on;saveUI();liveUI()}
+  narrowQ.addEventListener("change",()=>{if(ui.stats)liveUI()});
+  // touch screens have no hover: tapping a mark in the strip shows its details under the strip (tap again to clear)
+  $("zLive").addEventListener("click",e=>{const g=e.target.closest("g[data-tip]"),tp=$("zLive").querySelector(".zl-tip");if(!tp)return;
+    const sel=$("zLive").querySelector("g.sel");if(sel)sel.classList.remove("sel");
+    if(!g||sel===g){tp.textContent="";return}g.classList.add("sel");tp.textContent=g.dataset.tip});
   function rolling(S,n){const h=hist(S).slice(-n);return{n:h.length,pass:h.filter(x=>x.p!=null?x.p:x.m===x.o).length}}
   function progUI(){const S=C.S;if(!S||!S.ready)return;drillUI();liveUI();
     if(S.drill){const n=Object.keys(S.prog.cards).length,left=drillLeft(S).length;barEl.style.width=(n?(n-left)/n*100:100).toFixed(1)+"%";progEl.textContent=`drilling reviews · ${n-left} / ${n} drilled · schedule unchanged`;return}
@@ -334,7 +374,7 @@ const ZEN=(function(){
     $("zDlo").disabled=$("zDhi").disabled=auto||!S.ready;$("zDnote").textContent=auto?"Used with random states.":"Optimal moves of the first step. Pick one depth, a band, or “x and up” by setting the top to the maximum.";
     const s=hist(S).slice(-100),n=s.length;
     const st=stats(s);
-    $("zStats").innerHTML=st?`<div><b>${fmt(st.t)}</b><span>mean s</span></div><div><b>${fmt(st.m,1)}</b><span>moves</span></div><div><b>${fmt(st.opt,1)}</b><span>optimal</span></div><div><b>+${fmt(st.o,1)}</b><span>over (±${fmt(st.sd,1)})</span></div><div><b>${fmt(st.tps,1)}</b><span>tps</span></div>`:`<p class="note" style="margin:0">No solves yet with this method.</p>`;
+    $("zStats").innerHTML=st?`<div><b>${fmt(st.t)}</b><span>mean s</span></div><div><b>${fmt(st.m,1)}</b><span>moves</span></div><div><b>${fmt(st.opt,1)}</b><span>optimal</span></div><div><b>${pct(st.clean,st.n)}</b><span>clean${st.miss?` · 1 in ${Math.round(st.n/st.miss)} missed`:""}</span></div><div><b>+${st.extra}</b><span>extra moves</span></div><div><b>${fmt(st.tps,1)}</b><span>tps</span></div>`:`<p class="note" style="margin:0">No solves yet with this method.</p>`;
     const rc=rolling(S,100),nc=Object.keys(S.prog.cards).length,nm=S.classic?Object.keys(S.prog.mastered).length:null;
     let miss="";const ks=s.filter(x=>x.k!=null&&!x.p);if(ks.length>=5){const c={};ks.forEach(x=>{c[x.k+1]=(c[x.k+1]||0)+1});const top=Object.entries(c).sort((a,b)=>b[1]-a[1])[0];miss=` · misses most often on move ${top[0]} (${Math.round(top[1]/ks.length*100)}%)`}
     $("zCounts").hidden=!n;$("zCounts").textContent=`last ${n} solves · standard met ${rc.n?Math.round(rc.pass/rc.n*100):0}%${nm!=null?` · ${nm} cases cleared`:""} · ${nc} in review${miss}`;
