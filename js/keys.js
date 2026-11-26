@@ -2,17 +2,18 @@
 "use strict";
 const KEYMAP=(function(){
   const ACTIONS=[
-    ["left","Slide a tile left · picks the column (left choice)",["ArrowLeft","a","j"]],
-    ["right","Slide a tile right · picks the row (right choice)",["ArrowRight","d","l"]],
+    ["left","Slide a tile left · picks the column (left choice) · one move back in a review",["ArrowLeft","a","j"]],
+    ["right","Slide a tile right · picks the row (right choice) · one move on in a review",["ArrowRight","d","l"]],
     ["up","Slide a tile up",["ArrowUp","w","i"]],
     ["down","Slide a tile down",["ArrowDown","s","k"]],
     ["next","Next case",[" ","Enter"]],
     ["slip","Mouse slip: restart the case (takes back a miss)",["c"]],
-    ["replay","Replay: back to the start of this part of the review (press again quickly to go further back)",["r"]],
+    ["replay","In a review: play this mistake again, slower each time",["r"]],
+    ["compare","In a review: switch between the best line and the moves you played",["y"]],
     ["optimal","Show / hide optimal",["h"]],
     ["stats","Show / hide stats",["t"]],
     ["fs","Fullscreen",["f"]],
-    ["p1","Switch to 3x2",["1"]],["p2","Switch to 3x3",["2"]],["p3","Switch to 4x3",["3"]],["p4","Switch to 4x4",["4"]],["p5","Switch to the sequence trainer",["5"]]];
+    ["p1","Train only the 3x2",["1"]],["p2","Train only the 3x3",["2"]],["p3","Train only the 4x3",["3"]],["p4","Train only the 4x4",["4"]],["p5","Train the whole solve (every section)",["5"]]];
   const LS="ssa-keys-v1",IGNORE=new Set(["Shift","Control","Alt","Meta","CapsLock","Escape","Tab","Dead","Unidentified","Process"]);
   const norm=k=>k.length===1?k.toLowerCase():k;
   let map=load(),capturing=null;const subs=[];

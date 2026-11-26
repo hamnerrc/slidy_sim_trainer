@@ -7,7 +7,7 @@
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
-<link rel="stylesheet" href="css/styles.css?v=20261124a">
+<link rel="stylesheet" href="css/styles.css?v=20261125a">
 </head>
 <body>
 
@@ -23,8 +23,8 @@
 <div id="view-train" class="view">
   <div class="zen" id="zen">
     <div class="zen-top">
-      <div class="seg" role="tablist" aria-label="Puzzle">
-        <button type="button" role="tab" data-key="3x2" aria-selected="true">3x2</button><button type="button" role="tab" data-key="3x3" aria-selected="false">3x3</button><button type="button" role="tab" data-key="4x3" aria-selected="false">4x3</button><button type="button" role="tab" data-key="4x4" aria-selected="false">4x4</button><button type="button" role="tab" data-key="seq" aria-selected="false" title="Sequence trainer: several stages in one solve">Seq</button>
+      <div class="seg zsecs" role="group" aria-label="Sections of the solve to train" id="zSecs" title="Which sections of the solve to train. One section is that puzzle on its own; several are solved one after another on one board.">
+        <label class="zsec"><input type="checkbox" data-sec="4x4"><span>4x4</span></label><label class="zsec"><input type="checkbox" data-sec="4x3"><span>4x3</span></label><label class="zsec"><input type="checkbox" data-sec="3x3"><span>3x3</span></label><label class="zsec"><input type="checkbox" data-sec="3x2"><span>3x2</span></label>
       </div>
       <label class="zmq"><span class="sr">Method</span><select id="zMethQ" aria-label="Method"></select></label>
       <div class="zen-tools">
@@ -39,7 +39,7 @@
       <ol class="zen-steps" id="zSteps" aria-label="Method steps" hidden></ol>
       <div class="zen-target" id="zTarget">loading…</div>
       <div class="zen-tag" id="zTag"></div>
-      <div class="zwrap"><div class="zboard" id="zBoard" aria-label="Sliding puzzle"></div><div class="zlock" aria-hidden="true"><i id="zLock"></i></div></div>
+      <div class="zwrap" id="zWrap"><div class="zboard" id="zBoard" aria-label="Sliding puzzle"></div><div class="zlock" aria-hidden="true"><i id="zLock"></i></div></div>
       <div class="zen-sub" id="zSub"></div>
       <div class="zen-fb" id="zFb" aria-live="polite"></div>
       <div class="zen-seq" id="zSeq"></div>
@@ -48,24 +48,15 @@
     <div class="zen-progress"><div class="zbar" aria-hidden="true"><i id="zBar"></i></div><span id="zProg"></span></div>
     <div class="zpanel" id="zPanel" hidden role="dialog" aria-modal="true" aria-labelledby="zpTitle">
      <div class="zp-sheet">
-      <div class="zp-head"><h3 id="zpTitle"><span id="zPuz"></span> settings</h3><button type="button" class="btn" id="zClose">Done</button></div>
+      <div class="zp-head"><h3 id="zpTitle">Settings</h3><div class="zp-secs" id="zpSecs" aria-label="Section"></div><button type="button" class="btn" id="zClose">Done</button></div>
       <nav class="zp-nav" aria-label="Settings pages">
         <button type="button" data-page="method" id="zpNavMethod">Method</button><button type="button" data-page="scr">Scrambles</button><button type="button" data-page="solve">Solving</button><button type="button" data-page="prog">Progress</button>
       </nav>
       <div class="zp-body">
        <div class="zp-page" data-page="method">
-        <section class="zp-sec" id="zSeqSec" hidden>
-          <h4>Sequence</h4>
-          <div class="zp-two"><label class="zp-row" for="zSeqFrom">Start from<select id="zSeqFrom"></select></label>
-          <label class="zp-row" for="zSeqTo">Go<select id="zSeqTo"></select></label></div>
-          <label class="zp-check" id="zSeqMirRow"><input type="checkbox" id="zSeqMir" role="switch"><span>Mirrored starts<small id="zSeqMirNote"></small></span></label>
-          <h4 class="zp-h5">A method for each stage</h4>
-          <div class="zp-seqst" id="zSeqStages"></div>
-          <p class="note zp-exp" id="zSeqExp" aria-live="polite"></p>
-          <p class="note">Methods are written the usual way round; each stage is turned to match the board (build column 1 first and the 4x3 stage becomes a 3x4, so column 5-9-13 becomes row 2-3-4). A missed step doesn't stop the solve: finish it, and every miss is reviewed at the end, each from the board you really reached.</p>
-        </section>
         <section class="zp-sec" id="zMethSec">
           <h4>Method</h4>
+          <p class="note" id="zpSecNote"></p>
           <label class="zp-row" for="zMeth" id="zMethRow"><span class="sr">Method</span><select id="zMeth"></select></label>
           <p class="note" id="zMethNote"></p>
           <p class="note zp-exp" id="zMethExp" aria-live="polite"></p>
@@ -105,6 +96,8 @@
         <label class="zp-check"><input type="checkbox" id="zHover" role="switch"><span>Hover controls<small>The gap follows the mouse, or your finger as you drag.</small></span></label>
         <label class="zp-row" for="zSize">Board size<input type="range" id="zSize" min="35" max="100" step="1"></label>
         <label class="zp-row" for="zBuf">Pause before a new scramble accepts moves<select id="zBuf"><option value="0">None</option><option value="0.5">0.5 s</option><option value="1">1 s</option><option value="1.5">1.5 s</option><option value="2">2 s</option></select></label>
+        <label class="zp-row" for="zRmode">After a miss<select id="zRmode"><option value="flow">Flow · show the fix, then carry on</option><option value="study">Study · stop on each mistake</option></select></label>
+        <p class="note">Flow suits many quick attempts; Study suits slow, careful ones. In Flow, any review control (again, step, yours) stops it on that miss.</p>
         <label class="zp-row" for="zPace">Replay speed after a miss<select id="zPace"><option value="auto">Auto (about 6 s)</option><option value="2">2 moves/s</option><option value="4">4 moves/s</option><option value="8">8 moves/s</option></select></label>
         </section>
        </div>
@@ -400,17 +393,17 @@
   <button type="button" class="btn" id="keysReset">Reset to defaults</button>
 </dialog>
 
-<script src="js/data.js?v=20261124a"></script>
-<script src="js/puzzle.js?v=20261124a"></script>
-<script src="js/hero.js?v=20261124a"></script>
-<script src="js/solver.js?v=20261124a"></script>
-<script src="js/methods.js?v=20261124a"></script>
-<script src="js/plans.js?v=20261124a"></script>
-<script src="js/keys.js?v=20261124a"></script>
-<script src="js/trainer.js?v=20261124a"></script>
-<script src="js/advisor.js?v=20261124a"></script>
-<script src="js/tables.js?v=20261124a"></script>
-<script src="js/views.js?v=20261124a"></script>
+<script src="js/data.js?v=20261125a"></script>
+<script src="js/puzzle.js?v=20261125a"></script>
+<script src="js/hero.js?v=20261125a"></script>
+<script src="js/solver.js?v=20261125a"></script>
+<script src="js/methods.js?v=20261125a"></script>
+<script src="js/plans.js?v=20261125a"></script>
+<script src="js/keys.js?v=20261125a"></script>
+<script src="js/trainer.js?v=20261125a"></script>
+<script src="js/advisor.js?v=20261125a"></script>
+<script src="js/tables.js?v=20261125a"></script>
+<script src="js/views.js?v=20261125a"></script>
 
 </body>
 </html>

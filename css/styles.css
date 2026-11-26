@@ -447,3 +447,58 @@ kbd{font-family:var(--mono);font-size:.72rem;padding:1px 6px;border-radius:5px;b
 .zen-live .zl-sbox:empty{display:none}
 .zen-live .zl-tbox{width:100%;display:flex;flex-direction:column;align-items:flex-start;gap:10px;min-width:0}
 .zen-live .zl-tbox > *{margin-inline:auto}
+
+/* ---------- review after a miss: quiet, the board does the talking ---------- */
+.zboard .tile{position:relative}
+.zboard .tile.out{filter:saturate(.35) brightness(.55)}
+.zboard .tile.cue{box-shadow:inset 0 0 0 calc(var(--t)*.055) #151515}
+.zboard .tile.gr.cue{box-shadow:inset 0 0 0 calc(var(--t)*.055) #d8d8d8}
+.zboard .tile.off{box-shadow:inset 0 0 0 calc(var(--t)*.055) var(--you),inset 0 0 0 999px rgba(0,0,0,.4)}
+.zen-target .z-rv{color:var(--muted);text-transform:lowercase;letter-spacing:.14em;font-size:.74rem}
+.zen-target .z-rv.z-yrs{color:var(--you)}
+.zen-target .z-auto{color:var(--muted);opacity:.7}
+.z-card{display:flex;flex-wrap:wrap;justify-content:center;align-items:baseline;column-gap:10px;row-gap:2px}
+.z-count{font-family:var(--mono);font-size:.72rem;color:var(--muted)}
+.z-name{font-family:var(--mono);font-weight:600;font-size:.92rem;color:var(--ink)}
+.z-over{font-family:var(--mono);font-size:.8rem;color:var(--you)}
+.z-card .z-why{font-size:.9rem;color:var(--ink);opacity:.85;margin:0}
+.z-note{flex-basis:100%;font-size:.8rem;color:var(--muted)}
+.z-ctl{display:flex;justify-content:center;align-items:center;gap:4px;margin-top:10px}
+.z-ctl button{border:0;background:none;color:var(--muted);font:inherit;font-family:var(--mono);font-size:1rem;line-height:1;padding:6px 9px;border-radius:8px;cursor:pointer;min-width:34px}
+.z-ctl button:hover{color:var(--ink);background:var(--sunk)}
+.z-ctl button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.z-ctl .z-tx{font-size:.78rem;letter-spacing:.04em}
+.z-ctl .z-tx.on{color:var(--you)}
+.z-ctl .z-go{color:var(--ink)}
+.z-flow{font-family:var(--mono);font-size:.66rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);opacity:.6;margin-left:6px}
+/* stats: a tab per section */
+.zl-secs{display:flex;gap:4px;justify-content:center;flex-wrap:wrap;margin-bottom:10px}
+.zl-secs button{border:1px solid transparent;background:none;color:var(--muted);font-family:var(--mono);font-size:.8rem;padding:4px 10px;border-radius:8px;cursor:pointer;display:grid;justify-items:center;line-height:1.25}
+.zl-secs button small{font-size:.62rem;opacity:.75;max-width:14ch;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.zl-secs button[aria-selected=true]{color:var(--ink);background:var(--sunk);border-color:var(--line)}
+.zl-secs button.off:not([aria-selected=true]){opacity:.55}
+/* settings: a tab per section */
+.zp-head{flex-wrap:wrap;gap:8px}
+.zp-secs{display:inline-flex;gap:2px;background:var(--sunk);border-radius:9px;padding:3px;margin-right:auto}
+.zp-secs button{border:0;background:none;color:var(--muted);font-family:var(--mono);font-size:.8rem;padding:4px 10px;border-radius:7px;cursor:pointer;display:inline-flex;align-items:center;gap:5px}
+.zp-secs button[aria-current=true]{background:var(--surface);color:var(--ink)}
+.zp-secs button i{width:5px;height:5px;border-radius:50%;background:var(--muted);opacity:.6}
+#zpSecNote:empty{display:none}
+
+/* ---------- sections of the solve (checkboxes in place of puzzle tabs) ---------- */
+.zsecs{align-items:center}
+.zsec{position:relative;display:inline-flex;align-items:center;cursor:pointer}
+.zsec input{position:absolute;opacity:0;width:1px;height:1px;pointer-events:none}
+.zsec span{display:inline-flex;align-items:center;gap:6px;color:var(--muted);font-family:var(--mono);font-size:.86rem;padding:6px 11px;border-radius:8px}
+.zsec span::before{content:"";width:.8em;height:.8em;border:1.5px solid currentColor;border-radius:3px;box-sizing:border-box;flex:none}
+.zsec input:checked+span{background:var(--surface);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.14)}
+.zsec input:checked+span::before{background:var(--accent);border-color:var(--accent);box-shadow:inset 0 0 0 2px var(--surface)}
+.zsec input:focus-visible+span{outline:2px solid var(--accent);outline-offset:1px}
+.zsec:hover span{color:var(--ink)}
+@media (max-width:640px){.zsec span{padding:6px 8px;gap:5px}}
+@media (max-width:420px){.zsec span{padding:6px 6px;font-size:.8rem;gap:4px}.zsec span::before{width:.7em;height:.7em}}
+.zboard .tile.hint[data-arrow]::before,.zboard .tile.wrong[data-arrow]::before{content:attr(data-arrow);position:absolute;left:0;right:0;bottom:4%;text-align:center;
+  font-size:calc(var(--t)*.26);line-height:1;font-weight:700;color:#111;font-family:Arial,Helvetica,sans-serif}
+.zboard .tile.wrong[data-arrow]::before{color:#a3261b}
+.zboard .tile.hint{box-shadow:inset 0 0 0 calc(var(--t)*.07) #111}
+.zboard .tile.gr.hint[data-arrow]::before{color:#f0f0f0}

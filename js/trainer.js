@@ -1,7 +1,7 @@
 /* Zen trainer: every puzzle is trained with a chosen method, step by step, each step graded against its exact standard */
 "use strict";
 const ZEN=(function(){
-  const KEYS=["3x2","3x3","4x3","4x4","seq"];
+  const KEYS=["3x2","3x3","4x3","4x4"];
   const DEFAULT={"3x2":"opt","3x3":"opt","4x3":"col","4x4":"pairs"};
   const PER=10;                        // cases per 3x3 depth in the depth-by-depth progression
   const STEPS=[3,8,25,"break"];        // after a miss: standard again after 3, 8, 25 solves, then after an 8 h break
@@ -43,37 +43,20 @@ const ZEN=(function(){
      the line's own optimum). The chosen orientation is then solved with the method, turned to match. */
   const PICKM={};
 
-  /* ---------- Sequence trainer ----------
-     A range of stages solved on one board: scrambles start as the "from" puzzle and the attempt ends at the "through"
-     point. Each stage is graded with the method chosen for it (set-ups graded as set-ups, and then you solve what you
-     set up). A stage whose method finishes the puzzle (e.g. full 3x3 optimal) ends the list. Stages follow the board:
-     build column 1 instead of row 1 and the next stage is a 3x4; with Mirrors on, square stages (the 4x4's and
-     the 3x3's first line) accept either way round and grade the choice like pick mode. A missed step doesn't stop the
-     solve; the first one is replayed at the end. */
-  const SEQ_ST=["4x4","4x3","3x3","3x2"];
-  const SEQ_END=[["4x3","until the 4x3 is left (row 1 done)",0],["3x3","until the 3x3 is left (first L done)",1],["3x2","until the 3x2 is left",2],["2x2","until the 2x2 is left",3],["solved","solved",3]];
-  const SEQ_FROM={"4x4":"a 4x4 scramble","4x3":"a 4x3 scramble (row 1 solved)","3x3":"a 3x3 scramble (first L solved)","3x2":"a 3x2 scramble"};
-  const SEQ_DEF={"4x4":"pairs","4x3":"col","3x3":"rowo","3x2":"opt"};
-  ui.seq=Object.assign({start:"4x4",end:"solved"},ui.seq||{});ui.seq.m=Object.assign({},SEQ_DEF,ui.seq.m||{});
-  // mirroring is per stage: mir["4x4"] / mir["3x3"] let that square stage go either way round; mir.start lets a 4x3 / 3x2 start be the 3x4 / 2x3
-  if(!ui.seq.mir){const on=!!ui.seq.mirror;ui.seq.mir={start:on,"4x4":on,"3x3":on};delete ui.seq.mirror}
-  const PAIR32={id:"pair",name:"10-14 pair optimal",steps:[{t:[10,14]}],desc:"Places 10 and 14, leaving the 2x2."};
-  const seqEnds=start=>SEQ_END.filter(e=>e[2]>=SEQ_ST.indexOf(start)&&!(e[0]===start));
-  function stageMethods(st,end){
-    if(st==="3x2")return end==="2x2"?[PAIR32]:methods("3x2").filter(m=>!m.steps.some(x=>x.prefix));
-    const L=methods(st).filter(m=>!m.steps.some(x=>x.prefix||x.alts));
-    return L.filter(m=>!m.steps.some(x=>x.rest)||(st==="3x3"&&end==="solved"))}
-  function seqStages(){const c=ui.seq;if(!seqEnds(c.start).some(e=>e[0]===c.end))c.end="solved";
-    const a=SEQ_ST.indexOf(c.start),b=SEQ_END.find(e=>e[0]===c.end)[2],out=[];
-    for(let i=a;i<=b;i++){const st=SEQ_ST[i],L=stageMethods(st,c.end),M=L.find(m=>m.id===c.m[st])||L.find(m=>m.id===SEQ_DEF[st])||L[0];
-      out.push({st,M,L});if(st!=="3x2"&&M.steps.some(x=>x.rest))break}
-    return out}
-  const SEQM={};
-  function seqMethod(){const c=ui.seq,stg=seqStages(),id="seq:"+c.start+">"+c.end+(c.mir.start&&ALT[c.start]?"~m":"")+(ui.flex.seq?"~f":"")+"|"+stg.map(x=>x.st+"="+x.M.id+(c.mir[x.st]&&SQ[x.st]?"~m":"")).join(",");
-    if(SEQM[id])return SEQM[id];const steps=[],si=[];stg.forEach((x,i)=>x.M.steps.forEach(sp=>{steps.push(sp);si.push(i)}));
-    return SEQM[id]={id,name:`${c.start} → ${c.end==="solved"?"solved":c.end+" left"}`,steps,desc:"Sequence: "+stg.map(x=>`${x.st} ${x.M.name}`).join(" · "),
-      flex:!!ui.flex.seq,seq:{stages:stg.map(x=>x.st),stg:si,mir:Object.assign({},c.mir),start:c.start}}}
-  const altOn=S=>S.M.seq?(S.M.seq.mir.start&&ALT[S.d.key]?ALT[S.d.key].pk:null):altPk(S.d.key);
+  /* ---------- sections of the solve ----------
+     A 4x4 solve in four sections: 4x4 (the first line), 4x3 (column 5-9-13), 3x3 (the L), 3x2 (the finish). Any of
+     them can be checked. Every attempt is one 4x4 board: sections you checked you solve, graded by that section's own
+     method; the others play themselves at their method's standard, quickly (before your first section, that is the
+     pause before the scramble). Each checked section is its own case, saved with that section and method, so the
+     same step with the same method is one history however it is trained. */
+  const SECS=["4x4","4x3","3x3","3x2"];
+  const SECNAME={"4x4":"4x4 · first line","4x3":"4x3 · column 5-9-13","3x3":"3x3 · the L","3x2":"3x2 · finish"};
+  if(!Array.isArray(ui.secs)){   // from the old tabs: one puzzle, or the sequence's range
+    const q=ui.seq||{};if(ui.tab==="seq"&&q.start){const a=SECS.indexOf(q.start),b={"4x3":0,"3x3":1,"3x2":2,"2x2":3,solved:3}[q.end];ui.secs=SECS.slice(Math.max(0,a),(b==null?3:b)+1)}
+    else ui.secs=[SECS.includes(ui.tab)?ui.tab:"3x2"]}
+  ui.rmode=ui.rmode||"flow";ui.sz=ui.sz||ui.size["4x4"]||80;
+  const checked=()=>SECS.filter(k=>ui.secs.includes(k));
+  const altOn=S=>altPk(S.d.key);
   function pickMethod(key,M){const line=lineOf(key,M);if(!line)return null;const id=key+"|"+M.id;
     return PICKM[id]||(PICKM[id]=Object.assign({},M,{id:M.id+"~pick",base:M.base||M.id,pick:{line}}))}
   const FLEXM={};
@@ -96,7 +79,7 @@ const ZEN=(function(){
   const methods=key=>METHODS.list(key,(ui.custom[key]||[]).map(c=>parsed(key,c)).filter(Boolean));
   function baseMethod(key){const L=methods(key),id=ui.meth[key]||DEFAULT[key];return L.find(m=>m.id===id)||L.find(m=>m.id===DEFAULT[key])||L[0]}
   function curMethodNoPick(key){let M=baseMethod(key);if(ui.flex[key]&&orderable(M.steps))M=flexMethod(key,M);return M}
-  function curMethod(key){if(key==="seq")return seqMethod();let M=baseMethod(key);if(ui.flex[key]&&orderable(M.steps))M=flexMethod(key,M);return ui.pick[key]&&pickMethod(key,M)||M}
+  function curMethod(key){let M=baseMethod(key);if(ui.flex[key]&&orderable(M.steps))M=flexMethod(key,M);return ui.pick[key]&&pickMethod(key,M)||M}
   function mstate(d,M){if(d.ms[M.id])return d.ms[M.id];const classic=M.id==="opt"&&d.exact;
     const pk=classic?"ssa-v3-"+d.key:"ssa-m-"+d.key+"-"+M.id,hk=classic?"ssa3-"+d.key:"ssa4-"+d.key+"-"+M.id;
     let prog=classic?d.classic:store.get(pk);if(!prog)prog={clock:0,cards:{}};prog.cards=prog.cards||{};prog.clock=prog.clock||0;
@@ -143,10 +126,7 @@ const ZEN=(function(){
   /* Build every table the method needs (one dry run through its steps). */
   function prepare(S){if(S.ready)return;if(S.classic)prepExact(S.d);
     const runs=[[S.d.key,false]];if(ALT[S.d.key])runs.push([ALT[S.d.key].pk,false]);if(S.M.pick)runs.push([S.d.key,true]);
-    // a sequence on a square board can turn (column 1 first makes every later stage transposed); a 4x3 / 3x2 start's
-    // turned version is its own board (3x4 / 2x3), covered by the run above
-    if(S.M.seq&&PUZ[S.d.key].w===PUZ[S.d.key].h)runs.push([S.d.key,"T"]);
-    runs.forEach(([key,flip])=>{let walls=[];const all=flip==="T"?S.M.steps.map(sp=>mapSpec(sp,T4)):stepsFor(S,key,flip);
+    runs.forEach(([key,flip])=>{let walls=[];const all=stepsFor(S,key,flip);
     for(let i=0;i<all.length;i++){const sp=all[i];
       // tables for the bigger steps this method can turn into from here
       if(mergeMode(S.d.key)!=="off")for(let j=all.length-1;j>i;j--){const m=METHODS.merge(all.slice(i,j+1));if(m&&METHODS.mergeable(key,m,walls)){try{METHODS.resolve(key,m,walls)}catch(e){}}}
@@ -155,7 +135,7 @@ const ZEN=(function(){
       if(sp.prefix||R.rest)break;walls=walls.concat(R.alts[0].map(METHODS.home))}});
     // a few solves played through every plan, orientation and order build the tables those choices use, so none has
     // to be built in the middle of a solve
-    if(S.M.seq||S.M.pick||S.M.flex||S.M.steps.length>1)for(let i=0;i<12;i++){try{simSolve(S)}catch(e){}}
+    if(S.M.pick||S.M.flex||S.M.steps.length>1)for(let i=0;i<12;i++){try{simSolve(S)}catch(e){}}
     S.ready=true}
 
   /* ---------- classic progression (full 3x2 / 3x3 optimal) ---------- */
@@ -184,9 +164,9 @@ const ZEN=(function(){
   function cardItem(S,k){const c=S.prog.cards[k],pk=S.pkOf(k),b=S.fromKey(k),dep=depthOf(S,b,pk);return{b,pk,card:k,depth:dep,parts:altTag(pk).concat([{t:`review · ${c.step} of ${STEPS.length} done`},{t:"depth "+dep,d:1}])}}
   function pick(S){if(S.drill)return drillPick(S);const p=S.prog,now=Date.now();let best=null;
     for(const k of activeCards(S)){const c=p.cards[k];if(k===S.lastK)continue;if(c.due<=p.clock&&(c.dueT||0)<=now&&(!best||c.due<p.cards[best].due))best=k}
-    if(best)return cardItem(S,best);
-    if(S.classic&&p.src==="auto"){const it=classicItem(S);if(it)return it}
-    return randomItem(S)}
+    if(best)return Object.assign(cardItem(S,best),{src:"card"});
+    if(S.classic&&p.src==="auto"){const it=classicItem(S);if(it)return Object.assign(it,{src:"classic"})}
+    return Object.assign(randomItem(S),{src:"random"})}
 
   /* ---------- review drill: only cases in review, until each meets the standard DRILL times in a row ---------- */
   const DRILL=2;
@@ -198,14 +178,15 @@ const ZEN=(function(){
   function drillJudge(S,it,hit){const k=S.kof(it.b,it.pk),st=S.drill.streak;
     if(hit){st[k]=(st[k]||0)+1;return st[k]>=DRILL?"drilled · out of this drill":`${DRILL-st[k]} more in a row`}
     st[k]=0;return "streak reset"}
-  function setDrill(on){const S=C.S;if(!S)return;S.drill=on?{streak:{}}:null;closePanel();drillUI();progUI();next()}
-  function drillUI(){const b=$("zDrill"),S=C.S;if(!b||!S)return;const n=activeCards(S).length;
-    b.innerHTML=S.drill?'Back<span class="zl"> to training</span>':`Drill<span class="zl"> reviews</span>${n?` (${n})`:""}`;b.setAttribute("aria-pressed",S.drill?"true":"false");b.classList.toggle("on",!!S.drill);
-    b.disabled=!S.drill&&!n;b.title=S.drill?"Return to normal training":n?"Practice only the cases in review":"No cases in review yet"}
-  function drillDone(){const S=C.S,n=activeCards(S).length;C.phase="done";C.it=null;C.R=null;C.b=goal(C.P.w*C.P.h);render();boardCls("good");lockAnim(0);boardEl.classList.remove("locked");
-    targetEl.innerHTML=n?`<b>${n}</b> review case${n>1?"s":""} drilled`:"nothing in review";tagEl.textContent="";subEl.textContent="";seqEl.innerHTML="";stepsUI();
-    fb(`<b class="z-ok">✓ ${n?"every review case met the standard "+DRILL+" times in a row":"no cases left in review"}</b><div class="z-btns">${n?'<button class="z-link" data-z="drill">drill again</button>':""}<button class="z-link" data-z="exit">back to training</button></div>`)}
-
+  // drilling covers the review cases of every checked section; each drill case is that section alone
+  const drillCount=()=>checked().reduce((a,k)=>a+activeCards(sOf(k)).length,0);
+  function setDrill(on){C.drill=!!on;SECS.forEach(k=>{sOf(k).drill=on?{streak:{}}:null});closePanel();drillUI();refresh()}
+  function drillUI(){const b=$("zDrill");if(!b)return;const n=drillCount(),on=!!C.drill;
+    b.innerHTML=on?'Back<span class="zl"> to training</span>':`Drill<span class="zl"> reviews</span>${n?` (${n})`:""}`;b.setAttribute("aria-pressed",on?"true":"false");b.classList.toggle("on",on);
+    b.disabled=!on&&!n;b.title=on?"Return to normal training":n?"Practice only the cases in review":"No cases in review yet"}
+  function drillDone(){const n=drillCount();C.phase="done";C.run=null;C.it=null;C.R=null;setFrame("4x4");C.b=goal(16);render(C.b,null,[]);boardCls("good");lockAnim(0);boardEl.classList.remove("locked");
+    targetEl.innerHTML=`<span class="z-lab">${n?`${n} review case${n>1?"s":""} drilled`:"nothing in review"}</span>`;tagEl.textContent="";subEl.textContent="";seqEl.innerHTML="";stepsUI();
+    fb(`<b class="z-ok">✓ ${n?"every review case met the standard "+DRILL+" times in a row":"no cases left in review"}</b><div class="z-ctl">${n?'<button class="z-tx" data-z="drill">drill again</button>':""}<button class="z-tx" data-z="exit">back to training</button></div>`)}
   /* ---------- spaced repetition ---------- */
   function sched(p,c){const s=STEPS[c.step];if(s==="break"){c.due=p.clock+5;c.dueT=Date.now()+BREAK_MS}else{c.due=p.clock+s;c.dueT=0}}
   function judge(S,it,hit){const p=S.prog;p.clock++;const k=S.kof(it.b,it.pk);let c=p.cards[k],note="";
@@ -229,27 +210,38 @@ const ZEN=(function(){
   const stdPending=()=>!!stdF;
   function stdLater(gen){if(stdJob)stdJob.dead=true;const job=stdJob=sliced(gen,v=>{if(stdJob===job){stdV=v;stdF=null;stdJob=null;setTarget()}});stdF=()=>job.finish()}
   const later=(fn,ms)=>{C.timers.push(setTimeout(fn,ms))};
-  function buildCells(){const P=C.P;boardEl.innerHTML="";boardEl.style.gridTemplateColumns=`repeat(${P.w},auto)`;C.cells=[];
-    for(let i=0;i<P.w*P.h;i++){const t=document.createElement("button");t.type="button";t.tabIndex=-1;
-      t.addEventListener("pointerdown",e=>{e.preventDefault();closePanel();toCell(i)});
-      t.addEventListener("pointerenter",e=>{if(ui.hover&&e.pointerType==="mouse")toCell(i)});
+  /* The board is always the 4x4. The section being solved is a smaller puzzle inside it, in its own coordinates
+     (local cell j sits on 4x4 cell gmap(pk)[j]); cells outside it hold tiles already home. */
+  const FR={};
+  const gmap=pk=>FR[pk]||(FR[pk]=PUZ[pk].labels.map(l=>l-1).concat([15]));
+  function setFrame(pk){C.pk=pk;C.P=PUZ[pk];C.map=gmap(pk);C.inv=new Array(16).fill(-1);C.map.forEach((g,j)=>{C.inv[g]=j})}
+  const cellOf=k=>C.cells[C.map[k]];
+  function buildCells(){boardEl.innerHTML="";boardEl.style.gridTemplateColumns="repeat(4,auto)";C.cells=[];
+    for(let g=0;g<16;g++){const t=document.createElement("button");t.type="button";t.tabIndex=-1;
+      t.addEventListener("pointerdown",e=>{e.preventDefault();closePanel();if(C.inv&&C.inv[g]>=0)toCell(C.inv[g])});
+      t.addEventListener("pointerenter",e=>{if(ui.hover&&e.pointerType==="mouse"&&C.inv&&C.inv[g]>=0)toCell(C.inv[g])});
       boardEl.appendChild(t);C.cells.push(t)}}
   // touch/pen: dragging a finger across the board moves the gap to the tile under it (hover mode)
-  boardEl.addEventListener("pointermove",e=>{if(!ui.hover||e.pointerType==="mouse"||!C.cells.length)return;
-    const el=document.elementFromPoint(e.clientX,e.clientY),i=el?C.cells.indexOf(el.closest&&el.closest(".tile")):-1;if(i>=0)toCell(i)});
-  /* tiles outside the current step are greyed; tiles placed by earlier steps keep their colour */
+  boardEl.addEventListener("pointermove",e=>{if(!ui.hover||e.pointerType==="mouse"||!C.cells.length||!C.inv)return;
+    const el=document.elementFromPoint(e.clientX,e.clientY),g=el?C.cells.indexOf(el.closest&&el.closest(".tile")):-1;if(g>=0&&C.inv[g]>=0)toCell(C.inv[g])});
+  /* tiles outside the current step are greyed; tiles placed by earlier steps keep their colour; earlier sections are quiet */
   function render(b,R,walls){b=b||C.b;R=R===undefined?C.R:R;walls=walls||C.walls;const P=C.P,act=R?new Set(C.plan&&R===C.R?C.plan.tiles:R.tiles):null,fz=new Set(walls.map(c=>c+1));
-    b.forEach((v,i)=>{const t=C.cells[i];if(!t)return;
+    C.cells.forEach((t,g)=>{const i=C.inv[g];
+      if(i<0){t.className="tile out "+sgrp(g+1);t.textContent=g+1;t.removeAttribute("aria-label");return}
+      const v=b[i];
       if(!v){t.className="tile blank";t.textContent="";t.setAttribute("aria-label","gap");return}
       const l=P.labels[v-1],grey=act&&!act.has(v)&&!fz.has(v);t.className="tile "+(grey?"gr":sgrp(l))+(fz.has(v)&&act?" fz":"");t.textContent=l;t.removeAttribute("aria-label")})}
+  // a tile that just moved from local cell `from` to `to` glides there
+  function slide(from,to,ms){const a=cellOf(from),t=cellOf(to);if(!a||!t||ms<25||RM.matches)return;
+    const ra=a.getBoundingClientRect(),rt=t.getBoundingClientRect();t.style.transition="none";t.style.zIndex="1";t.style.transform=`translate(${ra.left-rt.left}px,${ra.top-rt.top}px)`;
+    void t.offsetWidth;t.style.transition=`transform ${Math.round(ms)}ms ease-out`;t.style.transform="";setTimeout(()=>{t.style.zIndex=""},ms)}
+  const RM=window.matchMedia("(prefers-reduced-motion:reduce)");
   const boardCls=c=>{boardEl.classList.remove("good","bad","dim");if(c)boardEl.classList.add(c)};
-  function layout(){if(!C.d)return;const P=C.d.P,fs=isFS();
+  function layout(){const fs=isFS();
     const W=(root.clientWidth||Math.min(window.innerWidth,1000))-40;
     const H=fs?window.innerHeight-230:Math.min(700,window.innerHeight-150)-230;
-    // with the 2x3 finish in the pool, size tiles for either orientation so they don't jump between cases
-    const al=C.S&&altOn(C.S),pw=al?Math.max(P.w,P.h):P.w,ph=al?Math.max(P.w,P.h):P.h;
-    const fit=Math.min(W/(pw+.3),Math.max(160,H)/(ph+.3),fs?230:150);
-    boardEl.style.setProperty("--t",Math.max(28,Math.round(fit*ui.size[C.key]/100))+"px")}
+    const fit=Math.min(W/4.3,Math.max(160,H)/4.3,fs?230:150);
+    boardEl.style.setProperty("--t",Math.max(28,Math.round(fit*ui.sz/100))+"px")}
   const multi=()=>C.S&&C.S.M.steps.length>1;
   /* name of what is left once `placed` cells are filled */
   function restName(key,placed){const n=PUZ[key].w*PUZ[key].h-placed;return({9:"3x3",6:"3x2",4:"2x2"})[n]||"rest"}
@@ -264,6 +256,7 @@ const ZEN=(function(){
     if(C.merged&&C.merged.length&&reveal())t+=(t?" · ":"")+C.merged.map(m=>`${m.n} steps as one: ${m.name}, ${m.d} ≤ your ${m.lim}`).join(" · ");
     tagEl.textContent=t}
   function setTarget(){const it=C.it;
+    if(C.phase==="review"&&C.rv&&C.rv.cap){targetEl.innerHTML=C.rv.cap;return}
     if(C.phase==="build"){targetEl.innerHTML='<span class="z-lab">building tables…</span>';return}
     if(C.plan&&C.R){const f=C.plan.firsts;targetEl.innerHTML=`<span class="z-lab">${esc(f.slice(0,-1).join(", ")+(f.length>1?" or ":"")+f[f.length-1])} first · your pick</span>`;return}
     if(C.phase==="pick"){const o=C.pickInfo;targetEl.innerHTML=`<span class="z-lab z-pq">which first?</span><button type="button" class="z-pick" data-pick="col"><kbd>${esc(KEYMAP.label(KEYMAP.keys("left")[0]||""))}</kbd>${esc(o.col.name)}</button><button type="button" class="z-pick" data-pick="row">${esc(o.row.name)}<kbd>${esc(KEYMAP.label(KEYMAP.keys("right")[0]||""))}</kbd></button>`;return}
@@ -293,7 +286,8 @@ const ZEN=(function(){
      it); a miss is any other solve, and its "extra" is the moves it went over the standard, so hard (deep) cases never
      count against you. Clean and extra are never trimmed: misses are rare, and trimming would throw away exactly the
      solves that matter. Moves and time are trimmed csTimer / Slidysim style for aoN (best and worst 5% dropped, one
-     each for ao5 and ao12); "opt" is the mean standard of the same cases. */
+     each for ao5 and ao12); "opt" is the mean standard of exactly the solves the moves figure kept, so with no misses
+     the two are equal. */
   const stdOf=x=>x.s!=null?x.s:x.o;
   const overOf=x=>stdOf(x)==null?null:(x.v!=null?x.v:x.m)-stdOf(x);
   const okOf=x=>x.p!=null?!!x.p:overOf(x)!=null&&overOf(x)<=0;
@@ -303,8 +297,10 @@ const ZEN=(function(){
   function statsC(S,h,a,b,trim){const x=h.slice(a,b);if(!x.length)return null;const id=S.hk+"|"+trim+"|"+x.length+"|"+x[0].t+"|"+x[x.length-1].t;
     let v=STC.get(id);if(!v){v=stats(x,trim);STC.set(id,v);if(STC.size>200)STC.delete(STC.keys().next().value)}return v}
   function stats(h,trim){const n=h.length;if(!n)return null;
-    const g=h.filter(x=>stdOf(x)!=null),ms=h.filter(x=>!okOf(x)),extra=ms.reduce((a,x)=>a+Math.max(0,overOf(x)||0),0);
-    const t=tmean(h.map(x=>x.t),trim),m=tmean(h.map(x=>x.m),trim);
+    const ms=h.filter(x=>!okOf(x)),extra=ms.reduce((a,x)=>a+Math.max(0,overOf(x)||0),0);
+    const t=tmean(h.map(x=>x.t),trim);let k=h;
+    if(trim&&n>=3){const c=Math.max(1,Math.ceil(n*.05));k=h.slice().sort((a,b)=>a.m-b.m).slice(c,n-c)}
+    const m=k.reduce((a,x)=>a+x.m,0)/k.length,g=k.filter(x=>stdOf(x)!=null);
     return{n,t,m,opt:g.length?g.reduce((a,x)=>a+stdOf(x),0)/g.length:NaN,clean:n-ms.length,miss:ms.length,extra,tps:t?m/t:NaN}}
   /* clean share as a percent that never rounds a miss away: 997 / 1000 is 99.7%, never 100% */
   function pct(c,n){if(!n)return"—";if(c===n)return"100%";const v=c/n*100;return(v>=99?Math.floor(v*10)/10:Math.floor(v))+"%"}
@@ -354,13 +350,18 @@ const ZEN=(function(){
         if(okOf(x))g.arc(j*10+5,20,2.4,0,7);else{const o=overOf(x),e=Math.min(4,Math.max(1,o||1)),ht=7+4*(e-1);g.rect(j*10+1,23-ht,8,ht)}g.fill()}})}
   /* stats under the board: the strip of every solve, then last solve, ao5 … ao1000 as the history allows, and this session */
   const WIN=[5,12,50,100,200,500,1000];
+  /* the section whose stats show: the one you picked in the tabs, or else the one being solved */
+  const statKey=()=>SECS.includes(ui.ssec)?ui.ssec:SECS.includes(C.key)?C.key:checked()[0]||"3x2",statS=()=>sOf(statKey());
+  $("zLive").addEventListener("click",e=>{const b=e.target.closest("[data-ssec]");if(!b)return;ui.ssec=b.dataset.ssec===ui.ssec?null:b.dataset.ssec;saveUI();liveUI()});
   function liveUI(){const el=$("zLive"),b=$("zStatBtn");b.setAttribute("aria-pressed",ui.stats?"true":"false");b.classList.toggle("on",ui.stats);
     const l=ui.stats?"Hide stats (T)":"Show stats (T)";b.setAttribute("aria-label",l);b.title=l;
     el.hidden=!ui.stats;if(!ui.stats||!C.S)return;
-    const S=C.S,h=hist(S),n=h.length;
-    // two boxes made once: the strip (its canvases are kept and only redrawn) and the table (rebuilt)
-    let sb=el.querySelector(".zl-sbox"),tb=el.querySelector(".zl-tbox");if(!sb){el.innerHTML='<div class="zl-sbox"></div><div class="zl-tbox"></div>';sb=el.querySelector(".zl-sbox");tb=el.querySelector(".zl-tbox")}
-    if(!n){const ex=S.ready?simExpect(S,rr=>{if(C.S===S&&ui.stats&&rr.done)liveSoon()},"live"):null,ok=ex&&ex.n&&!(ex.na&&!ex.n);
+    const sk=statKey(),S=sOf(sk),h=hist(S),n=h.length;
+    // boxes made once: a tab per section, the strip (its canvases are kept and only redrawn) and the table (rebuilt)
+    let sb=el.querySelector(".zl-sbox"),tb=el.querySelector(".zl-tbox");if(!sb){el.innerHTML='<div class="zl-secs" role="tablist" aria-label="Section"></div><div class="zl-sbox"></div><div class="zl-tbox"></div>';sb=el.querySelector(".zl-sbox");tb=el.querySelector(".zl-tbox")}
+    el.querySelector(".zl-secs").innerHTML=SECS.map(k=>`<button type="button" role="tab" data-ssec="${k}" aria-selected="${k===sk}"${ui.secs.includes(k)?"":' class="off"'}>${k}<small>${esc(sOf(k).M.name)}</small></button>`).join("");
+    if(sb.dataset.s!==sk+"|"+S.M.id){sb.dataset.s=sk+"|"+S.M.id;sb.dataset.k=""}
+    if(!n){const ex=S.ready?simExpect(S,rr=>{if(statS()===S&&ui.stats&&rr.done)liveSoon()},"live"):null,ok=ex&&ex.n&&!(ex.na&&!ex.n);
       sb.innerHTML="";sb.dataset.k="";tb.innerHTML=`<p class="zl-none">no solves yet with this method${ok?` · if optimal: about ${fmt(ex.sum/ex.n,1)} moves a solve`:""}</p>`;return}
     const rows=[["last",1,1]];WIN.forEach(w=>{if(n>=w)rows.push(["ao"+w,w,1])});
     const sn=Math.min(S.sess||0,n);if(sn>1)rows.push(["session",sn,0]);
@@ -383,17 +384,17 @@ const ZEN=(function(){
         `<span>${fmt(a.tps,1)}</span>`]});
     // one table on wide screens; on a phone, accuracy and speed as two narrower tables so nothing scrolls sideways
     // what this method averages when every step is at its standard (simulated random solves, these exact settings)
-    if(S.ready){const ex=simExpect(S,rr=>{const t=performance.now();if(C.S===S&&ui.stats&&(rr.done||!rr.lu||t-rr.lu>1500)){rr.lu=t;liveSoon()}},"live");
-      if(!(ex.na&&!ex.n)){const mean=ex.n?ex.sum/ex.n:NaN,ci=ex.n?1.96*Math.sqrt(Math.max(0,ex.sq/ex.n-mean*mean))/Math.sqrt(ex.n):NaN,mu='<span class="zl-mu">—</span>';
+    if(S.ready){const ex=simExpect(S,rr=>{const t=performance.now();if(statS()===S&&ui.stats&&(rr.done||!rr.lu||t-rr.lu>1500)){rr.lu=t;liveSoon()}},"live");
+      if(!(ex.na&&!ex.n)){const mean=ex.n?simTrim(ex):NaN,ci=ex.n?1.96*Math.sqrt(Math.max(0,ex.sq/ex.n-mean*mean))/Math.sqrt(ex.n):NaN,mu='<span class="zl-mu">—</span>';
         cells.push(Object.assign([`<span class="zl-l zl-ideal">if optimal <small>${ex.n||"…"} sims</small></span>`,`<span>${mu}</span>`,`<span>${mu}</span>`,
-          `<span><b>${ex.n?fmt(mean,2):"…"}</b>${ex.n?`<small>±${fmt(ci,1)}${ex.done?"":" · counting"}</small>`:""}</span>`,`<span>${mu}</span>`,`<span>${mu}</span>`,`<span>${mu}</span>`],{ideal:true}))}}
+          `<span><b>${ex.n?fmt(mean,2):"…"}</b>${ex.n?`<small>±${fmt(ci,1)}${ex.done?"":" · counting"}</small><small>plain mean ${fmt(ex.sum/ex.n,2)}</small>`:""}</span>`,`<span>${mu}</span>`,`<span>${mu}</span>`,`<span>${mu}</span>`],{ideal:true}))}}
     const H=[`${n} solve${n>1?"s":""}`,"clean","extra moves","moves","optimal","time","tps"];
     const table=(cols,cls)=>`<div class="zl-tab ${cls}" style="grid-template-columns:auto repeat(${cols.length-1},auto)"><div class="zl-h">${cols.map(c=>`<span>${H[c]}</span>`).join("")}</div>`+
       cells.filter(r=>!(r.ideal&&cls==="acc")).map(r=>`<div class="zl-r">${cols.map(c=>r[c]).join("")}</div>`).join("")+`</div>`;
     const narrow=narrowQ.matches;
     const per=narrow?50:100;stripInto(sb,h,per);
     tb.innerHTML=(narrow?table([0,1,2],"acc")+table([0,3,4,5,6],"spd"):table([0,1,2,3,4,5,6],"all"))+
-      `<p class="zl-note">clean = met the method's standard · extra moves = total moves over the standard in the misses, so hard cases never count against you · moves and time in aoN drop the best and worst 5% (1 each for ao5 / ao12); clean and extra moves count every solve</p>`;soon(()=>drawStrip(el,h))}
+      `<p class="zl-note">clean = met the method's standard · extra moves = total moves over the standard in the misses, so hard cases never count against you · moves and time in aoN drop the best and worst 5% (1 each for ao5 / ao12), and optimal is the standard of the same solves the moves figure kept; clean and extra moves count every solve · if optimal is trimmed the same way as an ao100 or longer</p>`;soon(()=>drawStrip(el,h))}
   /* the strip's rows are rebuilt only when their number (or the row length) changes; otherwise the counts are updated in place */
   function stripInto(sb,h,per){const n=h.length,R=Math.ceil(n/per),k=per+"|"+R;
     if(sb.dataset.k!==k){sb.innerHTML=strip(h,per);sb.dataset.k=k;return}
@@ -407,14 +408,14 @@ const ZEN=(function(){
   // touch screens have no hover: tapping a mark in the strip shows its details under the strip (tap again to clear)
   // a mark under the pointer (hover with a mouse, tap on touch) shows its solve in the line under the strip
   function stripPoint(e,tap){const cv=e.target.closest&&e.target.closest(".zl-rows canvas"),el=$("zLive"),tp=el.querySelector(".zl-tip");if(!tp)return;
-    if(!cv){if(tap){tp.textContent="";el.querySelectorAll("canvas[data-sel]").forEach(c=>delete c.dataset.sel);drawStrip(el,hist(C.S))}return}
-    const per=+cv.closest(".zl-viz").dataset.per,r=cv.getBoundingClientRect(),j=Math.floor((e.clientX-r.left)/r.width*per),i=+cv.dataset.end-per+j,h=hist(C.S);
+    if(!cv){if(tap){tp.textContent="";el.querySelectorAll("canvas[data-sel]").forEach(c=>delete c.dataset.sel);drawStrip(el,hist(statS()))}return}
+    const per=+cv.closest(".zl-viz").dataset.per,r=cv.getBoundingClientRect(),j=Math.floor((e.clientX-r.left)/r.width*per),i=+cv.dataset.end-per+j,h=hist(statS());
     if(j<0||j>=per||i<0||i>=h.length)return;el.querySelectorAll("canvas[data-sel]").forEach(c=>delete c.dataset.sel);cv.dataset.sel=i;tp.textContent=tipOf(h,i);drawStrip(el,h)}
   $("zLive").addEventListener("click",e=>stripPoint(e,true));
   $("zLive").addEventListener("pointermove",e=>{if(e.pointerType==="mouse")stripPoint(e,false)});
   function rolling(S,n){const h=hist(S).slice(-n);return{n:h.length,pass:h.filter(x=>x.p!=null?x.p:x.m===x.o).length}}
   let liveQ=0;const liveSoon=()=>{if(liveQ)return;liveQ=1;afterPaint(()=>{liveQ=0;liveUI()})};
-  window.addEventListener("resize",()=>{if(ui.stats)drawStrip($("zLive"),C.S?hist(C.S):[])});
+  window.addEventListener("resize",()=>{if(ui.stats)drawStrip($("zLive"),hist(statS()))});
   function progUI(){const S=C.S;if(!S||!S.ready)return;drillUI();liveSoon();
     const ph=S.M.pick?hist(S).slice(-100).filter(x=>x.c!=null):[],pickP=ph.length?` · picked the better line ${Math.round(ph.filter(x=>x.c).length/ph.length*100)}% of last ${ph.length}`:"";
     if(S.drill){const n=activeCards(S).length,left=drillLeft(S).length;barEl.style.width=(n?(n-left)/n*100:100).toFixed(1)+"%";progEl.textContent=`drilling reviews · ${n-left} / ${n} drilled · schedule unchanged`;return}
@@ -422,13 +423,15 @@ const ZEN=(function(){
     if(S.classic&&S.prog.src==="auto"&&classicSrc(S)){const g=classicProgress(S);barEl.style.width=(Math.min(1,g.f)*100).toFixed(1)+"%";
       progEl.textContent=g.txt+(rc.n?` · ${pct}% met of last ${rc.n}`:"")+(nc?` · ${nc} reviewing`:"")+(C.streak>1?` · streak ${C.streak}`:"");return}
     barEl.style.width=pct+"%";progEl.textContent=(rc.n?`standard met ${pct}% of last ${rc.n}`:"no solves yet with this method")+pickP+(nc?` · ${nc} reviewing`:"")+(C.streak>1?` · streak ${C.streak}`:"")}
-  function load(it){clearTimers();const pk=it.pk||C.key;
-    if(pk!==C.pk){C.pk=pk;C.P=PUZ[pk];buildCells()}C.steps=stepsFor(C.S,pk).slice();
+  /* starts one section's case (C.S is that section). o.ms: the pause before it accepts moves (the first section of an
+     attempt); o.cont: the clock runs from now (a section that follows straight on from yours) */
+  function load(it,o){o=o||{};clearTimers();const pk=it.pk||C.key;
+    setFrame(pk);C.steps=stepsFor(C.S,pk).slice();boardEl.classList.remove("dim");
     C.it=it;C.b=it.b.slice();C.moves=0;C.running=false;C.time=0;C.rv=null;C.si=0;C.walls=[];C.res=[];
     C.S.lastK=C.S.kof(it.b,pk);boardCls("");fb("");seqEl.innerHTML="";C.phase="load";C.pick=null;C.pickInfo=null;
     C.lim=mergeLimit(C.S);C.merged=[];C.undo=null;C.log=[];C.snaps=[];C.plan=null;C.planned=null;C.picks=[];C.A=false;
-    if(C.S.M.seq){C.steps=C.steps.slice();C.stg=C.S.M.seq.stg.slice();C.norm=C.S.M.steps.slice()}else{C.stg=C.steps.map(()=>0);C.norm=null}
-    const ms=Math.round(ui.buf*1000);
+    C.stg=C.steps.map(()=>0);C.norm=null;
+    const ms=o.ms||0;if(o.cont){C.running=true;C.t0=performance.now();requestAnimationFrame(tick)}
     if(C.S.M.pick){pickSetup();C.phase="pick";C.lockUntil=performance.now()+ms;lockAnim(ms);
       if(ms>0){boardEl.classList.add("locked");later(()=>{if(C.it===it)boardEl.classList.remove("locked")},ms)}else boardEl.classList.remove("locked");
       tagUI();stepsUI();setTarget();setSub();return}
@@ -457,7 +460,7 @@ const ZEN=(function(){
       if(keep.length&&keep.length<P.list.length){P.list=keep;P.all=P.all.filter(p=>p.ok());P.tiles=[...new Set(keep.flatMap(p=>p.R.tiles))];P.firsts=[...new Set(keep.map(p=>METHODS.stepName(C.pk,p.steps[0])))];render();setTarget()}})}
   /* a choice and what it is compared with: the best plan overall, and the best of the others (for "was right (29 vs 33)") */
   function pickRec(p,all,best,b0,walls){const others=all.filter(x=>x!==p&&Number.isFinite(x.m)),runner=others.length?others.reduce((x,y)=>y.m<x.m?y:x):null;
-    return{ok:p.m<=best.m,diff:Math.max(0,p.m-best.m),mine:p,other:best,runner,b0,walls,si:C.plan?C.plan.si:C.si}}
+    const si=C.plan?C.plan.si:C.si;return{ok:p.m<=best.m,diff:Math.max(0,p.m-best.m),mine:p,other:best,runner,b0,walls,si,st:C.stg[si]}}
   /* the first group finished decides the plan (the best of the plans that start with it) */
   function planChoose(){const P=C.plan;let done=P.list.filter(p=>!P.pre.has(p)&&METHODS.doneStep(p.R,C.b));
     if(done.some(p=>Number.isFinite(p.m)))done=done.filter(p=>Number.isFinite(p.m));
@@ -486,8 +489,7 @@ const ZEN=(function(){
   function startStep(){const key=C.pk;
     C.snaps.push({si:C.si,b:C.b.slice(),walls:C.walls.slice(),steps:C.steps.slice(),stg:C.stg.slice(),norm:C.norm&&C.norm.slice(),res:C.res.length,log:C.log.length,
       picks:C.picks.length,plan:C.plan,planned:C.planned,A:C.A,merged:C.merged.length,moves:C.moves});
-    if(C.norm&&(C.si===0||C.stg[C.si]!==C.stg[C.si-1]))stageStart();
-    else if(!C.norm&&C.si===0&&!C.pick&&!C.plan&&flexOn()&&C.steps.length>1)planStart(makePlans([{steps:C.steps.slice(),label:""}]),C.steps.length-1);
+    if(C.si===0&&!C.pick&&!C.plan&&flexOn()&&C.steps.length>1)planStart(makePlans([{steps:C.steps.slice(),label:""}]),C.steps.length-1);
     if(C.plan){const p=C.plan.list[0];C.R=p.R;C.std=p.std}else{if(!(C.planned&&C.planned.si===C.si))mergeAhead();C.R=METHODS.resolve(key,C.steps[C.si],C.walls);
       if(C.planned&&C.planned.si===C.si){const p=C.planned.p;C.std={std:p.m,d:p.std.d,path:p.path,plan:true}}
       else{const R=C.R,W=C.walls.slice(),B=C.b.slice();if(R.spec.la)stdLater(METHODS.standardG(key,R,W,B));else{const d=R.f(B);C.std={std:d,d}}}}
@@ -495,46 +497,41 @@ const ZEN=(function(){
     // a step whose tiles are already home counts as done with 0 moves
     if(C.plan){if(planChoose()){const v=stepValue(0);stepDone(v<=C.std.std,v)}return}
     if(!C.R.spec.prefix&&METHODS.doneStep(C.R,C.b)){const v=stepValue(0);stepDone(v<=C.std.std,v)}}
-  /* sequence: a new stage starts. Which way round is it? Read it off the shape of what is left (in 4x4 coordinates):
-     a 4x3 region that stands 3 wide and 4 tall is the 3x4, so the stage's method is transposed. Square stages keep the
-     way round they came in; with "Pick the best order" on they may go either way, and with "Flexible order" their
-     steps in any workable order: every plan is measured and the first group you finish picks one. */
-  function stageStart(){const S=C.S,st=S.M.seq.stages[C.stg[C.si]];
-    C.A=orientA(C.P,C.walls,st,C.A);
-    let end=C.si;while(end+1<C.steps.length&&C.stg[end+1]===C.stg[C.si])end++;
-    for(let k=C.si;k<C.steps.length;k++)C.steps[k]=C.A?mapSpec(C.norm[k],T4):C.norm[k];
-    C.plan=null;const variants=stageVariants(S.M,st,C.norm.slice(C.si,end+1),C.A);
-    if(variants.length<2&&!(flexOn()&&end>C.si))return;
-    planStart(makePlans(variants),end)}
-
   const simSolve=S=>{S.ap=altOn(S);return METHODS.run(simSolveG(S))};
   /* 3000 simulated solves per setting, played on a background thread (js/simworker.js) so they never touch a frame.
      Progress is saved as it goes and picks up where it left off on the next visit. Without workers it falls back to
      short slices here that pause entirely while you are solving. */
-  const SIM={},SIMLS="ssa-exp-v2",SIMN=3000,simSaved=store.get(SIMLS)||{};
+  const SIM={},SIMLS="ssa-exp-v3",SIMN=3000,simSaved=store.get(SIMLS)||{};
   const VER=(document.currentScript&&new URL(document.currentScript.src).search)||"";
   let simW=null,simFor=null;
-  try{simW=new Worker("js/simworker.js"+VER);simW.onmessage=e=>{const d=e.data,r=SIM[d.id];if(!r)return;Object.assign(r,{n:d.n,sum:d.sum,sq:d.sq});if(d.na)r.na=true;
-      if(d.done)r.done=true;if(r.n&&(d.done||r.n-(r.saved||0)>=250)){r.saved=r.n;simSaved[d.id]={n:r.n,sum:r.sum,sq:r.sq};store.set(SIMLS,simSaved)}
+  try{simW=new Worker("js/simworker.js"+VER);simW.onmessage=e=>{const d=e.data,r=SIM[d.id];if(!r)return;Object.assign(r,{n:d.n,sum:d.sum,sq:d.sq,hg:d.hg});if(d.na)r.na=true;
+      if(d.done)r.done=true;if(r.n&&(d.done||r.n-(r.saved||0)>=250)){r.saved=r.n;simSaved[d.id]={n:r.n,sum:r.sum,sq:r.sq,hg:r.hg};store.set(SIMLS,simSaved)}
       Object.values(r.subs).forEach(f=>f(r))};simW.onerror=()=>{simW=null}}catch(e){simW=null}
   const busy=()=>["solve","lock","pick","finishing"].includes(C.phase);
   // listeners by name (the settings page, the stats table) are told as the count grows
-  const simPost=(S,id,r)=>{simFor=id;simW.postMessage({id,key:S.d.key,M:JSON.parse(JSON.stringify(S.M)),ap:altOn(S),n:r.n,sum:r.sum,sq:r.sq,target:SIMN})};
+  const simPost=(S,id,r)=>{simFor=id;simW.postMessage({id,key:S.d.key,M:JSON.parse(JSON.stringify(S.M)),ap:altOn(S),n:r.n,sum:r.sum,sq:r.sq,hg:r.hg,target:SIMN})};
   function simExpect(S,onTick,tag){const id=(S.d.key)+"|"+S.M.id;let r=SIM[id];
     if(r){if(onTick)r.subs[tag||"x"]=onTick;if(!r.done&&simW&&simFor!==id)simPost(S,id,r);return r}
-    const sv=simSaved[id];r=SIM[id]=Object.assign({n:0,sum:0,sq:0},sv||{},{done:!!sv&&sv.n>=SIMN,subs:{}});if(onTick)r.subs[tag||"x"]=onTick;if(r.done)return r;
+    const sv=simSaved[id];r=SIM[id]=Object.assign({n:0,sum:0,sq:0,hg:{}},sv||{},{done:!!sv&&sv.n>=SIMN,subs:{}});if(onTick)r.subs[tag||"x"]=onTick;if(r.done)return r;
     if(simW){simPost(S,id,r);return r}
     S.ap=altOn(S);let lastSave=r.n,lastTell=0;
     const tell=()=>{Object.values(r.subs).forEach(f=>f(r))};
-    sliced((function*(){while(r.n<SIMN){let m;try{m=yield* simSolveG(S)}catch(e){m=NaN}if(!Number.isFinite(m)){r.na=true;break}r.n++;r.sum+=m;r.sq+=m*m;
-        if(r.n-lastSave>=250){lastSave=r.n;simSaved[id]={n:r.n,sum:r.sum,sq:r.sq};soon(()=>store.set(SIMLS,simSaved))}
+    sliced((function*(){while(r.n<SIMN){let m;try{m=yield* simSolveG(S)}catch(e){m=NaN}if(!Number.isFinite(m)){r.na=true;break}r.n++;r.sum+=m;r.sq+=m*m;r.hg[Math.round(m)]=(r.hg[Math.round(m)]||0)+1;
+        if(r.n-lastSave>=250){lastSave=r.n;simSaved[id]={n:r.n,sum:r.sum,sq:r.sq,hg:r.hg};soon(()=>store.set(SIMLS,simSaved))}
         const t=performance.now();if(t-lastTell>400){lastTell=t;soon(tell)}}})(),
-      ()=>{r.done=true;if(r.n){simSaved[id]={n:r.n,sum:r.sum,sq:r.sq};store.set(SIMLS,simSaved)}tell()},busy);
+      ()=>{r.done=true;if(r.n){simSaved[id]={n:r.n,sum:r.sum,sq:r.sq,hg:r.hg};store.set(SIMLS,simSaved)}tell()},busy);
     return r}
+  /* the simulated solves' mean after dropping the best and worst 5%, as a long aoN would: move counts pile up in a
+     few integers, so this works from their histogram, taking part of a bucket where the 5% cut falls inside it */
+  function simTrim(r){const hg=r.hg||{},ks=Object.keys(hg).map(Number).sort((a,b)=>a-b),c=ks.map(k=>hg[k]),n=c.reduce((a,b)=>a+b,0);
+    if(!n)return r.n?r.sum/r.n:NaN;let lo=n*.05,hi=n*.05,s=0;
+    for(let i=0;i<c.length&&lo>0;i++){const d=Math.min(c[i],lo);c[i]-=d;lo-=d}
+    for(let i=c.length-1;i>=0&&hi>0;i--){const d=Math.min(c[i],hi);c[i]-=d;hi-=d}
+    ks.forEach((k,i)=>{s+=k*c[i]});return s/(n*.9)}
   function simText(r){if(r.na&&!r.n)return"";if(!r.n)return"Working out the average…";const m=r.sum/r.n,sd=Math.sqrt(Math.max(0,r.sq/r.n-m*m)),ci=1.96*sd/Math.sqrt(r.n);
-    return `If you hit the standard on every step with these exact settings: about ${m.toFixed(1)} moves a solve (±${ci.toFixed(1)}, ${r.n} simulated random solves${r.done?"":", still counting"}).`}
-  function simUI(){const S=C.S,el=$(C.key==="seq"?"zSeqExp":"zMethExp");$("zSeqExp").textContent="";$("zMethExp").textContent="";if(!S||!S.ready||!el)return;
-    const want=S;const r=simExpect(S,rr=>{if(C.S===want&&panelOpen())el.textContent=simText(rr)},"panel");el.textContent=simText(r)}
+    return `If you hit the standard on every step with these exact settings: about ${m.toFixed(1)} moves a solve, ${simTrim(r).toFixed(1)} as a trimmed ao100 or longer (±${ci.toFixed(1)}, ${r.n} simulated random solves${r.done?"":", still counting"}).`}
+  function simUI(S){const el=$("zMethExp");el.textContent="";if(!S||!S.ready)return;
+    const r=simExpect(S,rr=>{if(panelOpen()&&PK===S.d.key&&sOf(PK)===S)el.textContent=simText(rr)},"panel");el.textContent=simText(r)}
   /* turn this step and the ones after it into one when that combined optimum is within your reliable depth */
   function mergeAhead(){const lim=C.lim,i=C.si,st=C.steps;if(!lim||i>=st.length-1)return;
     for(let j=st.length-1;j>i;j--){if(C.stg[j]!==C.stg[i])continue;   // never across sequence stages
@@ -542,9 +539,101 @@ const ZEN=(function(){
       let R;try{R=METHODS.resolve(C.pk,m,C.walls)}catch(e){continue}
       const d=R.f(C.b);if(d<=lim){C.steps=st.slice(0,i).concat([m],st.slice(j+1));C.stg=C.stg.slice(0,i).concat([C.stg[i]],C.stg.slice(j+1));
         if(C.norm)C.norm=C.norm.slice(0,i).concat([METHODS.merge(C.norm.slice(i,j+1))],C.norm.slice(j+1));C.merged.push({name:m.rest?"the rest":METHODS.stepName(C.pk,m),d,lim,n:j-i+1});tagUI();return}}}
-  function next(){flushFinish();clearTimers();const S=C.S;if(!S||!S.ready)return;
-    const it=pick(S);if(!it){drillDone();return}
-    load(it)}
+  /* ---------- one attempt: the checked sections in order, the others played for you ---------- */
+  const sOf=sec=>mstate(data(sec),curMethod(sec));
+  const solvedG=G=>G.every((v,g)=>v===(g<15?g+1:0));
+  const toG=(pk,b)=>{const P=PUZ[pk],G=goal(16);gmap(pk).forEach((g,j)=>{G[g]=b[j]?P.labels[b[j]-1]:0});return G};
+  const toL=(pk,G)=>{const P=PUZ[pk];return gmap(pk).map(g=>G[g]?P.labels.indexOf(G[g])+1:0)};
+  // which shape a section has on this board: the one whose outside is all home (row 1 first leaves the 4x3, column 1 the 3x4)
+  function regionFor(sec,G){const z=G.indexOf(0);
+    return[sec].concat(ALT[sec]?[ALT[sec].pk]:[]).find(pk=>{const inR=new Set(gmap(pk));if(!inR.has(z))return false;
+      for(let g=0;g<15;g++)if(!inR.has(g)&&G[g]!==g+1)return false;return true})||null}
+  /* a section played at its method's standard on local board b (changed in place); returns the moves. With a later
+     section still to be solved by you (bound), a method that would finish the puzzle (full 3x3 optimal) stops at the
+     section's own end instead: the better of its row and column. */
+  function* autoG(S,pk,b,bound){const M=S.M,P=PUZ[pk];let walls=[],path="";
+    const run=p=>{for(const L of p)applyLetter(b,P.w,P.h,L);path+=p};
+    if(bound&&SQ[pk]&&M.steps.some(x=>x.rest||x.prefix)){const L=lines(pk),v=[{steps:[{t:L.row}],label:"row"},{steps:[{t:L.col}],label:"col"}];
+      for(const x of v)yield* METHODS.ensureG(pk,x.steps[0],walls);const pl=plansFor(pk,v,walls,b,false);for(const p of pl)yield* p.warm();run(bestOf(pl).path);return path}
+    if(M.steps.some(x=>x.prefix)){yield* METHODS.ensureG(pk,{rest:1},[]);run(METHODS.descend(pk,METHODS.resolve(pk,{rest:1},[]),[],b));return path}
+    const variants=M.pick?["row","col"].map(ln=>({steps:stepsFor(S,pk,ln!==M.pick.line),label:ln})):[{steps:stepsFor(S,pk),label:""}];
+    if(variants.length>1||(M.flex&&M.steps.length>1)){for(const v of variants)for(const o of stepOrders(v.steps,!!M.flex))yield* METHODS.ensureG(pk,o[0],walls);
+      const pl=plansFor(pk,variants,walls,b,!!M.flex);for(const p of pl)yield* p.warm();const f=pl.filter(p=>Number.isFinite(p.m));if(f.length){run(bestOf(f).path);return path}}
+    for(const sp of stepsFor(S,pk)){yield* METHODS.ensureG(pk,sp,walls);const R=METHODS.resolve(pk,sp,walls);if(!Number.isFinite(R.f(b)))break;
+      run(sp.la?((yield* METHODS.standardG(pk,R,walls,b)).path||METHODS.descend(pk,R,walls,b)):METHODS.descend(pk,R,walls,b));walls=METHODS.wallsAfter(R,b,walls)}
+    return path}
+  // whatever is left that no section covers (the 2x2 after the 10-14 pair): solved outright
+  function smallSolve(G){const bad=[];G.forEach((v,g)=>{if(v!==(g<15?g+1:0))bad.push(g)});if(!bad.length)return"";
+    const x0=Math.min(...bad.map(g=>g%4)),y0=Math.min(...bad.map(g=>(g/4)|0)),cells=[];for(let y=y0;y<4;y++)for(let x=x0;x<4;x++)cells.push(y*4+x);if(cells.length>6)return null;
+    const key=b=>cells.map(c=>b[c]).join(","),gk=key(goal(16)),seen=new Map([[key(G),""]]);let fr=[G];
+    while(fr.length){const nx=[];for(const b of fr){const p=seen.get(key(b));if(key(b)===gk)return p;const z=b.indexOf(0);
+      for(const k of nbrs(z,4,4)){if(!cells.includes(k))continue;const t=b.slice();t[z]=t[k];t[k]=0;const kk=key(t);if(!seen.has(kk)){seen.set(kk,p+tileLetter(z,k,4));nx.push(t)}}}fr=nx}
+    return null}
+  /* from board G, sections from index i on: the unchecked ones are played (segments to animate) up to the next one you
+     solve; with none left, on to solved */
+  function* aheadG(G,i,mine){const segs=[];
+    for(;i<SECS.length;i++){if(solvedG(G))return{segs,G};const sec=SECS[i],pk=regionFor(sec,G);if(!pk)break;
+      if(mine.includes(sec))return{segs,G,next:{sec,pk}};
+      const b=toL(pk,G),b0=b.slice(),path=yield* autoG(sOf(sec),pk,b,mine.some(k=>SECS.indexOf(k)>i));if(path)segs.push({pk,b0,path});G=toG(pk,b)}
+    if(!solvedG(G)){const p=smallSolve(G);if(p){segs.push({pk:"4x4",b0:G.slice(),path:p});const b=G.slice();for(const L of p)applyLetter(b,4,4,L);G=b}else G=goal(16)}
+    return{segs,G}}
+  function itemFor(S,b,pk){const dep=depthOf(S,b,pk);return{b,pk,depth:dep,isNew:S.classic?!S.prog.mastered[S.kof(b,pk)]:true,parts:altTag(pk).concat([{t:"depth "+dep,d:1}])}}
+  /* a random 4x4 played up to the first section you solve; tried a few times when its depth has to fall in a band */
+  function forward(S,f){const [lo,hi]=range(S),t0=performance.now();
+    for(let n=0;n<60&&(n<1||performance.now()-t0<160);n++){const G=goal(16),B=METHODS.fillBoard("4x4",[],null);B.forEach((v,g)=>{G[g]=v});
+      let r;try{r=METHODS.run(aheadG(G,0,[f]))}catch(e){return null}
+      if(!r.next||r.next.sec!==f)continue;const it=itemFor(S,toL(r.next.pk,r.G),r.next.pk);
+      if(it.depth>=lo&&it.depth<=hi)return{G,segs:r.segs,it}}
+    return null}
+  /* the tables every section needs (the ones you don't check are played too), one section per task */
+  function buildAll(then){C.phase="build";setTarget();const todo=SECS.map(sOf).filter(S=>!S.ready);
+    const one=()=>{const S=todo.shift();if(!S){then();return}prepare(S);setTimeout(one,0)};setTimeout(one,40)}
+  /* A new attempt. The first section you solve takes its case from its own pool (reviews, progression, depth band);
+     a random case is reached by playing a real scramble up to it, so you see the solve so far. A case the pool picked
+     out (a review, the next case of a progression) starts with the earlier sections already done. */
+  function next(){flushFinish();clearTimers();C.running=false;const L=checked();
+    if(!L.length){emptyUI();return}
+    if(SECS.some(k=>!sOf(k).ready)){buildAll(next);return}
+    let f=L[0],it,mine=L;
+    if(C.drill){const c=L.filter(k=>drillLeft(sOf(k)).length);if(!c.length){drillDone();return}f=c[Math.floor(Math.random()*c.length)];it=drillPick(sOf(f));mine=[f]}
+    else it=pick(sOf(f));
+    let G0=null,segs=[];
+    if(f!=="4x4"&&it.src==="random"){const fw=forward(sOf(f),f);if(fw){G0=fw.G;segs=fw.segs;it=fw.it}}
+    begin({f,it,segs,mine,G0})}
+  function begin(st){const run=C.run={st,mine:st.mine,res:[],items:[],undo:[],m:0,t:0};
+    C.S=sOf(st.f);C.d=C.S.d;C.key=st.f;C.it=null;C.R=null;C.rv=null;fillQuick();drillUI();progUI();
+    $("zWrap").hidden=false;fb("");seqEl.innerHTML="";tagEl.textContent="";subEl.textContent="";stepsUI();
+    const buf=Math.round(ui.buf*1000);
+    if(!st.segs.length){load(st.it,{ms:buf});return}
+    // the pause before the scramble is the solve so far, played quickly
+    C.phase="auto";boardEl.classList.add("locked");const T=animSegs(st.segs,()=>{if(C.run===run)load(st.it,{ms:buf?Math.max(200,buf-T):0})});lockAnim(T+(buf?Math.max(200,buf-T):0))}
+  /* plays segments (moves of whole sections) quickly on the board, then calls done; returns about how long it takes */
+  function animSegs(segs,done,fast){const tot=segs.reduce((a,x)=>a+x.path.length,0),iv=Math.max(14,Math.min(55,(fast?1000:1500)/Math.max(1,tot)));
+    let si=0,j=0,b=null;C.phase="auto";
+    const go=()=>{if(si>=segs.length){done();return}const sg=segs[si];
+      if(j===0){setFrame(sg.pk);b=sg.b0.slice();render(b,null,[]);autoCap(sg.pk)}
+      if(j<sg.path.length){const L=sg.path[j++],z=b.indexOf(0),k=moveCell(L,b);applyLetter(b,C.P.w,C.P.h,L);render(b,null,[]);slide(k,z,iv*.9);later(go,iv)}
+      else{si++;j=0;later(go,110)}};
+    go();return tot*iv+segs.length*110}
+  function autoCap(pk){const sec=SECS.find(k=>k===pk||(ALT[k]&&ALT[k].pk===pk));targetEl.innerHTML=`<span class="z-lab z-auto">${sec?esc(sec):"the rest"} · played</span>`;tagEl.textContent=""}
+  /* a section of yours is done: play the next unchecked ones, then hand over to your next section, or end the attempt */
+  function afterSection(){const run=C.run,i=SECS.indexOf(C.key);C.phase="auto";C.running=false;
+    const pre=[];let b=C.b.slice();
+    if(C.S.M.steps.some(x=>x.prefix)){const b0=b.slice(),p=METHODS.descend(C.pk,METHODS.resolve(C.pk,{rest:1},[]),[],b);for(const L of p)applyLetter(b,C.P.w,C.P.h,L);if(p)pre.push({pk:C.pk,b0,path:p})}
+    sliced(aheadG(toG(C.pk,b),i+1,run.mine),r=>{if(C.run!==run)return;const segs=pre.concat(r.segs);
+      const go=()=>{if(C.run!==run)return;
+        if(r.next){const S=sOf(r.next.sec);C.S=S;C.d=S.d;C.key=r.next.sec;fillQuick();load(itemFor(S,toL(r.next.pk,r.G),r.next.pk),{cont:!segs.length});progUI();drillUI()}
+        else endRun()};
+      if(segs.length)animSegs(segs,go,true);else go()})}
+  function endRun(){const run=C.run,pass=run.res.every(r=>r.pass);C.streak=pass?C.streak+1:0;C.moves=run.m;C.time=run.t;setSub(true);
+    setFrame("4x4");C.b=goal(16);C.walls=[];C.R=null;C.it=C.it||{};render(C.b,null,[]);stepsUI();tagUI();progUI();
+    if(!run.items.length){C.phase="done";boardCls("good");const r1=run.res.length===1?run.res[0]:null;
+      targetEl.innerHTML=`<span class="z-lab">${r1&&r1.beat?`beat the standard by ${r1.beat}`:"✓"}</span>`;
+      fb(r1&&r1.note?`<span class="z-mute">${r1.note}</span>`:"");later(next,run.res.length>1?900:600);return}
+    C.rv={items:run.items,sum:run.res.length>1?`${run.res.filter(r=>r.pass).length} of ${run.res.length} sections at standard`:(run.res[0]&&run.res[0].note)||""};
+    C.phase="review";rvPlay(0,"best")}
+  function emptyUI(){C.run=null;C.phase="idle";C.it=null;C.rv=null;$("zWrap").hidden=true;fb("");seqEl.innerHTML="";tagEl.textContent="";subEl.textContent="";stepsUI();lockAnim(0);
+    targetEl.innerHTML='<span class="z-lab">check a section above to train it</span>';barEl.style.width="0";progEl.textContent=""}
   function canMove(){if(C.phase==="lock"&&performance.now()>=C.lockUntil){C.phase="solve";boardEl.classList.remove("locked")}return C.phase==="solve"}
   const isWall=c=>C.walls.includes(c);
   /* one single-tile move; returns false when the solve stopped (step missed or method finished) */
@@ -560,7 +649,7 @@ const ZEN=(function(){
     const pk=C.picks[C.picks.length-1],pickBad=!!pk&&!pk.ok&&pk.si===C.si;
     C.res.push({pickBad,name:R.spec.prefix?`first ${R.spec.prefix}`:R.rest?stepLabel(R):METHODS.stepName(C.pk,R.spec),std:R.spec.prefix?Math.min(R.spec.prefix,st):st,val:val==null?C.sp.length:val,pass,moves:C.sp.length,d:R.spec.prefix?null:C.std.d});
     // every step is kept for the review; a missed step doesn't stop a multi-step method: the next one is graded from where you are
-    C.log.push({b0:C.sb,path:C.sp,R,walls:C.walls.slice(),std:C.std,res:C.res[C.res.length-1],si:C.si,plan:C.planned&&C.planned.si===C.si?C.planned.p:null});
+    C.log.push({b0:C.sb,path:C.sp,R,walls:C.walls.slice(),std:C.std,res:C.res[C.res.length-1],si:C.si,st:C.stg[C.si],plan:C.planned&&C.planned.si===C.si?C.planned.p:null});
     if(!pass&&!goOn){finishSolve(false);return}
     if(R.spec.prefix||C.si+1>=C.steps.length){finishSolve(true);return}
     C.walls=METHODS.wallsAfter(R,C.b,C.walls);C.si++;
@@ -577,7 +666,8 @@ const ZEN=(function(){
   /* The last move must show at once: stop the clock, draw the board, and do the grading, saving and stats after the
      browser has painted. Anything that needs the result first (next case, switching puzzle, mouse slip) finishes it now. */
   function finishSolve(pass){C.running=false;C.time=(performance.now()-C.t0)/1000||0;setSub(true);render();C.phase="finishing";
-    const it=C.it;C.finishPend=()=>finishNow(pass);afterPaint(()=>{if(C.it===it)flushFinish()})}
+    const it=C.it;C.finishPend=()=>finishNow(pass);afterPaint(()=>{if(C.it===it)flushFinish()});
+    setTimeout(()=>{if(C.it===it)flushFinish()},150)}   // in case no frame comes (a throttled tab)
   function flushFinish(){if(C.finishPend){const f=C.finishPend;C.finishPend=null;f()}}
   function finishNow(pass){const S=C.S,it=C.it;
     // totals in real moves: v = the moves you played, s = v minus each step's over (a set-up's own over counts once) and each wrong pick's cost
@@ -588,138 +678,141 @@ const ZEN=(function(){
     const bad=picks.find(p=>!p.ok),pickBad=!!bad,misses=C.log.filter(x=>!x.res.pass),stepPass=pass&&!misses.length;
     pass=stepPass&&!pickBad;
     const e={t:+C.time.toFixed(3),m:C.moves,s:s-picks.reduce((a,p)=>a+p.diff,0),v,p:pass?1:0,d:it.depth};if(S.classic)e.o=e.s;if(C.pk!==C.d.key)e.z=C.pk;if(picks.length)e.c=pickBad?0:1;
-    /* the review: every wrong pick (the best plan played from where you chose) and every missed step (your moves up to
-       where they left the standard, then the standard from there), in solve order */
-    let rv=null;const items=[];
-    picks.filter(p=>!p.ok).forEach(p=>{const o=p.other,rest=o.steps.some(x=>x.rest),R=o.whole?o.R:METHODS.resolve(C.pk,rest?{rest:1}:{t:o.steps.flatMap(x=>x.t)},p.walls),kd=p.mine.setup?" set-up":"";
-      items.push({pickMiss:true,si:p.si,b0:p.b0.slice(),path:"",R,walls:p.walls.slice(),std:{std:o.m,path:o.path},res:{name:o.name,std:o.m,val:o.m,moves:0},div:{k:0,cont:o.path},
-        why:`You went with ${p.mine.name} (${p.mine.m}); ${o.name} takes ${o.m}${kd}. Here is ${o.name}:`})});
-    misses.forEach(x=>items.push(x.plan?planItem(x):Object.assign({},x,{div:METHODS.diverge(C.pk,x.R,x.walls,x.b0,x.path,x.std)})));
+    /* the review, in solve order: every wrong pick (the best plan, played from the start of that stage) and every
+       missed step (your moves while they were right, then the best from there). A miss inside a line or order you
+       picked wrongly is not shown on its own: what to learn there is the best plan overall, which the pick shows. */
+    let rv=null;const items=[],badSt=new Set(picks.filter(p=>!p.ok).map(p=>p.st));
+    picks.filter(p=>!p.ok).forEach(p=>{const o=p.other,rest=o.steps.some(x=>x.rest),R=o.whole?o.R:rest?METHODS.resolve(C.pk,{rest:1},p.walls):tilesOf(o.steps),
+        mineLog=C.log.filter(x=>x.st===p.st),mrest=p.mine.steps.some(x=>x.rest);
+      items.push({pickMiss:true,p,si:p.si,st:p.st,b0:p.b0.slice(),path:mineLog.map(x=>x.path).join(""),R,Ry:mrest?null:tilesOf(p.mine.steps),walls:p.walls.slice(),
+        std:{std:o.m,path:o.path},res:{name:o.name,std:o.m,val:p.mine.m,moves:0},div:{k:0,cont:o.path}})});
+    misses.filter(x=>!badSt.has(x.st)).forEach(x=>items.push(x.plan?planItem(x):Object.assign({},x,{div:METHODS.diverge(C.pk,x.R,x.walls,x.b0,x.path,x.std)})));
     items.sort((a,b)=>(a.si-b.si)||((b.pickMiss?1:0)-(a.pickMiss?1:0)));
-    if(items.length){rv={items};const f=items.find(x=>!x.pickMiss);if(f&&f.si===0)e.k=f.div.k}
-    const pp=bad||picks[0],mine=pp&&pp.mine,other=pp&&pp.other,kind=!pp?"":mine.setup?" set-up":"";
-    const pickTxt=pp&&!pickBad?picks.filter(p=>p.runner).map(p=>p.runner.m===p.mine.m?`${p.mine.name} ties ${p.runner.name} (${p.mine.m})`:`${p.mine.name} was right (${p.mine.m} vs ${p.runner.m})`).join(" · "):"",
-      pickHead=pickBad?`<b class="z-bad">✗ ${esc(other.name)} was better</b> <span class="z-mute">· ${esc(mine.name)} ${mine.m}, ${esc(other.name)} ${other.m}${kind}</span> `:"";
-    // sequences: how the whole attempt went
-    const nm=C.res.filter(r=>!r.pass||r.pickBad).length,seqTxt=C.norm?`${C.res.length-nm} of ${C.res.length} steps met · ${v} for a standard of ${e.s}`:"";
+    if(items.length){rv={items:items.map(reviewCard)};const f=items.find(x=>!x.pickMiss);if(f&&f.si===0)e.k=f.div.k}
     const rr=C.res.filter(r=>r.d!=null).map(r=>[r.d,r.pass?1:0]);if(rr.length)e.r=rr;if(C.merged.length)e.g=C.merged.length;
-    // mouse slip: what to put back if this miss is taken back
-    C.undo={h:h.slice(),prog:JSON.stringify(S.prog),drill:S.drill?JSON.stringify(S.drill.streak):null,streak:C.streak,sess:S.sess||0,it};
+    // mouse slip: what to put back if this attempt's misses are taken back
+    const run=C.run;run.undo.push({S,h:h.slice(),prog:JSON.stringify(S.prog),drill:S.drill?JSON.stringify(S.drill.streak):null,sess:S.sess||0});
     h.push(e);if(h.length>1000)h.shift();setHist(S,h);S.sess=(S.sess||0)+1;
-    const note=S.drill?drillJudge(S,it,pass):judge(S,it,pass);progUI();
-    C.streak=pass?C.streak+1:0;
-    if(pass){C.phase="done";boardCls("good");tagUI();stepsUI();setTarget();progUI();const beat=v<s;
-      const whole=C.steps.length===1&&C.steps[0].rest&&!C.steps[0].prefix;
-      fb(`<b class="z-ok">✓ ${beat?`beat the method by ${s-v}`:whole?"optimal":"standard met"}</b>${seqTxt?` <span class="z-mute">· ${esc(seqTxt)}</span>`:""}${pickTxt?` <span class="z-mute">· ${esc(pickTxt)}</span>`:""}${note?` <span class="z-mute">· ${note}</span>`:""}`);
-      later(next,multi()?900:600);return}
-    C.rv=rv;C.phase="review";boardCls("bad");tagUI();stepsUI();setTarget();progUI();
-    const extra=misses.reduce((a,x)=>a+Math.max(0,x.res.val-x.res.std),0),one=misses.length===1&&!pickBad?misses[0].res:null;
-    if(one&&one.name&&C.log[C.log.length-1].R.spec.prefix)C.head=`<b class="z-bad">✗</b> <span class="z-mute">· move ${one.moves} left the optimal path · ${note}</span>`;
-    else if(one&&!multi())C.head=`<b class="z-bad">+${one.val-one.std}</b> <span class="z-mute">· standard ${one.std}${seqTxt?" · "+esc(seqTxt):""} · ${note}</span>`;
-    else C.head=pickHead+(misses.length?`<b class="z-bad">✗ ${misses.length} of ${C.res.length} steps missed${extra?` · +${extra}`:""}</b> `:"")+
-      `<span class="z-mute">${!misses.length&&mine?`· your ${esc(mine.name)} met its standard · `:"· "}${seqTxt?esc(seqTxt)+" · ":""}${note}</span>`;
-    playReview()}
+    const note=S.drill?drillJudge(S,it,pass):judge(S,it,pass);
+    run.res.push({sec:C.key,pass,beat:pass&&v<s?s-v:0,note});run.m+=v;run.t+=C.time;
+    if(rv)rv.items.forEach(c=>{c.pk=C.pk;c.sec=C.key;run.items.push(c)});
+    boardCls(pass?"":"bad");stepsUI();progUI();afterSection()}
 
-  /* ---------- miss review: replay the missed step and show where it left the standard ---------- */
-  function hintTile(L,b){const P=C.P,z=b.indexOf(0);const k=L==="L"?z+1:L==="R"?z-1:L==="U"?z+P.w:z-P.w;if(C.cells[k])C.cells[k].classList.add("hint")}
+  /* ---------- the review after a miss ----------
+     One short line per mistake, and the board shows it: your moves while they were right, then your wrong move
+     slides out (dimmed) and back, and the better line plays from there. Two ways to use it:
+     Flow (default) plays each mistake once and carries on to the next case, for many attempts in a row.
+     Study stops on every mistake until you go on. In Flow, touching any review control stops it the same way.
+     R plays it again, slower each time; ← / → step through it move by move; Y shows your own moves from that point
+     instead of the better ones; Space goes on. */
   const ARROW={L:"←",R:"→",U:"↑",D:"↓"};
-  function seqHTML(pre,cont,j){return `<span class="z-pre">${pre}</span>${pre.length?'<span class="z-cut"></span>':""}`+[...cont].map((c,i)=>`<span class="${i<j?"z-done":i===j?"z-now":""}">${c}</span>`).join("")}
-  function laNote(rv){const R=rv.R;if(!R.spec.la)return "";const nx=nextName(C.pk,R,rv.walls);
-    const yours=rv.res.val-rv.res.moves,bestLen=rv.std.path.length,bestNext=rv.std.std-bestLen;
-    return ` Your ${METHODS.stepName(C.pk,R.spec)} took ${rv.res.moves} and left ${yours} for the ${nx}. The best set-up: ${bestLen} + ${bestNext}.`}
+  const moveCell=(L,b)=>{const P=C.P,z=b.indexOf(0);return L==="L"?z+1:L==="R"?z-1:L==="U"?z+P.w:z-P.w};
+  const moveTxt=(L,b)=>{if(!L)return"—";const v=b[moveCell(L,b)];return `${v?C.P.labels[v-1]:"?"} ${ARROW[L]}`};
+  function cue(L,b,cls){const c=L&&cellOf(moveCell(L,b));if(c)c.classList.add(cls||"cue")}
+  /* a review item → its line of text, and the moves the board plays */
+  function reviewCard(x){const P=C.P,k=x.div.k,b=x.b0.slice();for(let j=0;j<k;j++)applyLetter(b,P.w,P.h,x.path[j]);
+    const best=x.div.cont||"",r=x.res,c={pk:C.pk,b0:x.b0.slice(),R:x.R,Ry:x.Ry||null,walls:x.walls.slice(),pre:x.path.slice(0,k),best,yours:x.path.slice(k),over:0,note:""};
+    if(x.pickMiss){const p=x.p,o=p.other,m=p.mine;c.over=p.diff;c.pick=true;
+      c.name=o.name;c.line=`was better than your ${m.name}: ${o.m} against ${m.m}${m.setup?" with what each leaves":""}`;return c}
+    const sp=x.R.spec||{},la=!!sp.la;c.over=sp.prefix?0:Math.max(0,r.val-r.std);
+    c.name=sp.prefix?"opening":x.planStd?((x.plan&&x.plan.name)||r.name):r.name;
+    const mine=x.path[k],bm=best[0],at=k===0?"First move":`Move ${k+1}`;
+    c.line=!x.path.length?"already in place, but a better set-up was there"
+      :!mine?`right until the end, but it needed a different finish`
+      :`${at}: ${moveTxt(mine,b)}, better ${moveTxt(bm,b)}`;
+    if(la){const nx=nextName(C.pk,x.R,x.walls),bl=(x.std.path||"").length;c.note=`yours left ${r.val-r.moves} for the ${nx}; the better set-up ${bl} + ${x.std.std-bl}`}
+    return c}
   /* review item for a planned first step: on track while moves-so-far + the plan's best from there still equals its
      best total; the continuation shown is the rest of the best plan from where you left it */
   function planItem(x){const key=C.pk,p=x.plan,P=C.P,b=x.b0.slice();let k=0;
     for(let j=1;j<=x.path.length;j++){applyLetter(b,P.w,P.h,x.path[j-1]);if(j+METHODS.chainBest(key,p.steps,x.walls,b).v!==p.m)break;k=j}
     const bk=x.b0.slice();for(let j=0;j<k;j++)applyLetter(bk,P.w,P.h,x.path[j]);
-    const rest=p.steps.some(z=>z.rest),R=METHODS.resolve(key,rest?{rest:1}:{t:p.steps.flatMap(z=>z.t)},x.walls);
+    const R=p.steps.some(z=>z.rest)?METHODS.resolve(key,{rest:1},x.walls):tilesOf(p.steps);
     return Object.assign({},x,{R,planStd:true,div:{k,cont:METHODS.chainBest(key,p.steps,x.walls,bk).path}})}
-  /* R during a review goes back one phase: to the start of the part playing now (a miss, or your own moves between
-     misses); pressed again within a moment, one phase further back each time */
-  let lastR=0;
-  function replayBack(){const now=performance.now(),quick=now-lastR<900;lastR=now;
-    if(!C.revAt||C.revPh==null){playReview();return}
-    let ph=C.revPh;if(quick)ph=Math.max(0,ph-1);C.revAt(ph)}
-  /* plays every review item in solve order. Each one: your moves up to where they left the standard (quickly), then
-     the standard from there (at the replay pace). Between items your own moves are played on from that step's start, so
-     the next miss is shown from the board you really reached. */
-  function playReview(){clearTimers();const rv=C.rv,P=C.P,items=rv.items;C.phase="review";boardCls("bad");
-    const btns=`<div class="z-btns"><button class="z-link" data-z="replay">replay this (R)</button><button class="z-link" data-z="next">next (space)</button></div>`;
-    C.revAt=(ph)=>{clearTimers();C.phase="review";if(ph%2)yours((ph-1)/2);else play(ph/2)};
-    const play=idx=>{C.revPh=idx*2;const it=items[idx],div=it.div,b=it.b0.slice();C.b=b;C.R=it.R;C.std=it.std;C.walls=it.walls.slice();setTarget();render(b,it.R,it.walls);boardCls("bad");
-      const pre=it.path.slice(0,div.k),cont=div.cont||"",std=it.planStd?"the best plan":it.R.spec.la?"the best set-up":"optimal";
-      const lab=items.length>1?`<b>${idx+1} of ${items.length}</b> · ${esc(it.res.name)}${it.pickMiss?"":` +${Math.max(0,it.res.val-it.res.std)}`} · `:"";
-      const why=it.pickMiss?it.why:(div.k===0?`Your first move (${ARROW[it.path[0]]||"—"}) already left the standard. ${std[0].toUpperCase()+std.slice(1)} starts ${ARROW[cont[0]]||"—"}.`
-        :`Your first ${div.k} move${div.k>1?"s were":" was"} on standard. On move ${div.k+1} you went ${ARROW[it.path[div.k]]||"—"}; ${std} goes ${ARROW[cont[0]]||"—"}.`)+laNote(it);
-      fb(C.head+`<div class="z-why">${lab}${esc(why)}</div>`+btns);
-      seqEl.innerHTML=seqHTML(pre,cont,-1);
-      const iv=ui.pace==="auto"?Math.max(160,Math.min(480,6500/Math.max(1,cont.length))):1000/+ui.pace;
-      let i=0,j=0;const rr=()=>render(b,it.R,it.walls);
-      const preStep=()=>{if(i<pre.length){applyLetter(b,P.w,P.h,pre[i]);i++;rr();later(preStep,70)}else{rr();if(cont.length)hintTile(cont[0],b);later(contStep,pre.length?750:500)}};
-      const contStep=()=>{if(j<cont.length){applyLetter(b,P.w,P.h,cont[j]);j++;rr();seqEl.innerHTML=seqHTML(pre,cont,j);later(contStep,iv)}
-        else{boardCls("good");if(idx+1<items.length)later(()=>yours(idx),1100);else later(()=>{if(C.phase==="review")next()},1400)}};
-      later(preStep,350)};
-    // your own moves from this item's step up to the next item's, so the next one starts where you really were
-    const yours=idx=>{C.revPh=idx*2+1;const it=items[idx],nx=items[idx+1],steps=C.log.filter(x=>x.si>=it.si&&x.si<nx.si);
-      if(!steps.length){play(idx+1);return}
-      const b=steps[0].b0.slice();C.b=b;boardCls("");let k=0,q=0;
-      fb(C.head+`<div class="z-why">Now your own moves${steps.length>1?` through ${steps.map(x=>x.res.name).join(", ")}`:` for ${esc(steps[0].res.name)}`}, to where the next one starts…</div>`+btns);
-      seqEl.innerHTML=`<span class="z-pre">${steps.map(x=>x.path).join(" ")}</span>`;render(b,steps[0].R,steps[0].walls);
-      const go=()=>{if(k>=steps.length){later(()=>play(idx+1),500);return}const st=steps[k];
-        if(q<st.path.length){applyLetter(b,P.w,P.h,st.path[q]);q++;render(b,st.R,st.walls);later(go,60)}else{k++;q=0;later(go,k<steps.length?200:0)}};
-      later(go,400)};
-    play(0)}
+  // the tiles a plan places, for shading the board (no table lookup needed)
+  const tilesOf=steps=>({tiles:[...new Set(steps.flatMap(x=>x.t||[]).map(l=>METHODS.loc(C.pk,l)))]});
+  const rvTrack=(c,mode)=>c.pre+(mode==="yours"?c.yours:c.best);
+  const rvItem=()=>C.rv.items[C.rv.idx];
+  /* the board `pos` moves into the item, the next tile to move outlined, and a word above the board */
+  function rvShow(pos,ms){const rv=C.rv,c=rvItem(),yours=rv.mode==="yours",tr=rvTrack(c,rv.mode);setFrame(c.pk);
+    const P=C.P,b=c.b0.slice(),k=c.pre.length;pos=Math.max(0,Math.min(tr.length,pos));const step=rv.pos===pos-1;rv.pos=pos;
+    let from=-1,to=-1;for(let j=0;j<pos;j++){if(j===pos-1){to=b.indexOf(0);from=moveCell(tr[j],b)}applyLetter(b,P.w,P.h,tr[j])}
+    const cont=yours?c.yours:c.best,n=cont.length,at=pos-k;C.b=b;render(b,yours&&c.Ry?c.Ry:c.R,c.walls);if(step&&ms)slide(from,to,ms);
+    if(pos<tr.length)cue(tr[pos],b);
+    if(pos===k&&!yours&&!c.pick&&c.yours[0])cue(c.yours[0],b,"off");
+    boardCls(pos===tr.length&&!yours?"good":"");
+    rvCap(pos<k?"your moves":pos===k&&!c.pick&&c.yours.length?"here":at<n?`${yours?"yours":"better"} ${at+1}/${n}`:`${yours?"yours":"better"} · ${tr.length}`,yours)}
+  function rvCap(t,yours){C.rv.cap=`<span class="z-lab z-rv${yours?" z-yrs":""}">${esc(t)}</span>`;targetEl.innerHTML=C.rv.cap}
+  /* plays one item from pos `from`; `again` counts replays, each a little slower */
+  function rvPlay(idx,mode,again,from){clearTimers();const rv=C.rv;if(!rv)return;if(rv.idx!==idx){rv.again=0;rv.pos=-1}rv.idx=idx;rv.mode=mode||"best";rv.auto=true;
+    const c=rvItem(),k=c.pre.length,tr=rvTrack(c,rv.mode),n=tr.length-k,flow=ui.rmode==="flow"&&!rv.held,slow=again?Math.min(2.5,1+.5*again):1;
+    const pace=(ui.pace==="auto"?Math.max(flow?170:220,Math.min(flow?360:520,(flow?4200:6500)/Math.max(1,n))):1000/+ui.pace)*slow,preIv=Math.max(90,Math.min(220,1500/Math.max(1,k)))*slow;
+    C.phase="review";seqEl.innerHTML="";rvCard();
+    // at the move that went wrong: yours slides out dimmed, holds, slides back
+    const demo=then=>{const b=C.b.slice(),L=c.yours[0];if(!L||rv.mode!=="best"||c.pick){then();return}
+      const z=b.indexOf(0),m=moveCell(L,b);applyLetter(b,C.P.w,C.P.h,L);render(b,c.R,c.walls);cellOf(z).classList.add("off");slide(m,z,200);rvCap("yours");
+      later(()=>{rvShow(k);slide(z,m,200);later(then,450*slow)},700*slow)};
+    const go=pos=>{if(C.rv!==rv||!rv.auto)return;rvShow(pos,pos?Math.min(pos<=k?preIv:pace,260)*.85:0);
+      if(pos>=tr.length){rv.auto=false;rvCard();if(ui.rmode==="flow"&&!rv.held)later(()=>{if(C.rv===rv&&!rv.held)rvNext()},1100);return}
+      if(pos===k&&pos===(from||0)&&from)return later(()=>go(pos+1),500*slow);
+      if(pos===k)return later(()=>demo(()=>go(pos+1)),(k?500:700)*slow);
+      later(()=>go(pos+1),pos===0?600*slow:pos<k?preIv:pace)};
+    go(from||0)}
+  function rvCard(){const rv=C.rv,c=rvItem(),n=rv.items.length,yours=rv.mode==="yours",kl=id=>esc(KEYMAP.label(KEYMAP.keys(id)[0]||""));
+    fb(`<div class="z-card">${n>1?`<span class="z-count">${rv.idx+1}/${n}</span>`:""}<b class="z-name">${esc(c.name)}</b>${c.over?`<span class="z-over">+${c.over}</span>`:""}`+
+      `<span class="z-why">${esc(c.line)}</span>${c.note?`<span class="z-note">${esc(c.note)}</span>`:""}</div>`+
+      `<div class="z-ctl"><button data-z="again" title="Again, slower (${kl("replay")})" aria-label="Again">↺</button><button data-z="back" title="One move back (${kl("left")})" aria-label="One move back">‹</button><button data-z="fwd" title="One move on (${kl("right")})" aria-label="One move on">›</button>`+
+      (c.yours.length?`<button data-z="yours" class="z-tx${yours?" on":""}" title="Your own moves from there (${kl("compare")})">yours</button>`:"")+
+      `<button data-z="next" class="z-tx z-go" title="Go on (${kl("next")})">${rv.idx+1<n?"next":"done"} →</button>`+
+      (ui.rmode==="flow"&&!rv.held?`<span class="z-flow" title="Flow: carries on by itself. Any control here stops it.">flow</span>`:"")+`</div>`)}
+  function rvHold(){const rv=C.rv;if(rv&&!rv.held){rv.held=true;clearTimers();rv.auto=false}}
+  function rvNext(){const rv=C.rv;if(rv&&C.phase==="review"&&rv.idx+1<rv.items.length)rvPlay(rv.idx+1,"best");else next()}
+  function rvAgain(){const rv=C.rv;if(!rv)return;rvHold();rv.again=(rv.again||0)+1;rvPlay(rv.idx,rv.mode,rv.again)}
+  function rvStep(d){const rv=C.rv;if(!rv)return;rvHold();clearTimers();rv.auto=false;rvShow(rv.pos+d,d>0?160:0);rvCard()}
+  // yours ⇄ better, from the move where they part
+  function rvSwap(){const rv=C.rv;if(!rv)return;const c=rvItem();if(!c.yours.length)return;rvHold();rvPlay(rv.idx,rv.mode==="yours"?"best":"yours",rv.again,c.pre.length)}
 
-  /* ---------- tabs, method choice ---------- */
-  const tabs=[...root.querySelectorAll('.seg [role="tab"]')];
-  function select(key){if(!PUZ[key]&&key!=="seq")return;flushFinish();clearTimers();C.running=false;C.key=key;C.d=data(key==="seq"?ui.seq.start:key);ui.tab=key;saveUI();
-    C.S=mstate(C.d,curMethod(key));C.pk=C.d.key;C.P=C.d.P;C.steps=C.S.M.steps;drillUI();
-    tabs.forEach(t=>{const on=t.dataset.key===key;t.setAttribute("aria-selected",on);t.tabIndex=on?0:-1});
-    buildCells();layout();C.it=null;C.R=null;C.walls=[];C.res=[];C.streak=0;C.b=goal(C.P.w*C.P.h);render();boardCls("dim");fb("");seqEl.innerHTML="";tagEl.textContent="";subEl.textContent="";stepsUI();fillQuick();
-    if(key==="seq"&&!ui.seqSeen){ui.seqSeen=1;saveUI();openPanel("method")}
-    if(panelOpen())fillPanel();
-    const S=C.S;
-    if(!S.ready){C.phase="build";setTarget();setTimeout(()=>{if(C.S!==S)return;prepare(S);if(panelOpen())fillPanel();progUI();next()},40)}
-    else{progUI();next()}}
-  function setMethod(id){ui.meth[C.key]=id;saveUI();select(C.key)}
-  function fillQuick(){const q=$("zMethQ");q.disabled=C.key==="seq";
-    if(C.key==="seq"){q.innerHTML=`<option>${esc(C.S.M.name)}</option>`;q.title=C.S.M.desc;return}
-    const L=methods(C.key);q.innerHTML=L.map(m=>`<option value="${m.id}">${esc(m.name)}${m.custom?" (custom)":""}</option>`).join("");q.value=C.S.M.base||C.S.M.id;q.title=C.S.M.desc||""}
-  $("zMethQ").addEventListener("change",e=>{e.target.blur();setMethod(e.target.value);if(panelOpen())fillPanel()});
+  /* ---------- the section boxes, method choice ---------- */
+  const secEls=[...root.querySelectorAll("#zSecs input[data-sec]")];
+  function secUI(){secEls.forEach(x=>{x.checked=ui.secs.includes(x.dataset.sec)})}
+  $("zSecs").addEventListener("change",e=>{const t=e.target;if(!t.dataset.sec)return;t.blur();ui.secs=secEls.filter(x=>x.checked).map(x=>x.dataset.sec);saveUI();refresh()});
+  /* start over with the current settings (a new attempt; tables are built for whatever changed) */
+  function refresh(){flushFinish();clearTimers();C.run=null;C.rv=null;C.running=false;C.streak=0;secUI();fillQuick();layout();if(panelOpen())fillPanel();next()}
+  function select(key){if(!SECS.includes(key))return;ui.secs=[key];saveUI();refresh()}
+  function setMethod(sec,id){ui.meth[sec]=id;saveUI();refresh()}
+  // the method menu in the bar: there when one section is checked
+  function fillQuick(){const q=$("zMethQ"),L1=checked(),one=L1.length===1;q.parentElement.hidden=!one;if(!one)return;
+    const sec=L1[0],L=methods(sec),M=sOf(sec).M;q.innerHTML=L.map(m=>`<option value="${m.id}">${esc(m.name)}${m.custom?" (custom)":""}</option>`).join("");q.value=M.base||M.id;q.title=M.desc||""}
+  $("zMethQ").addEventListener("change",e=>{e.target.blur();const L1=checked();if(L1.length===1)setMethod(L1[0],e.target.value)});
   /* show / hide optimal */
   function eyeUI(){const b=$("zEye");b.setAttribute("aria-pressed",ui.pre?"true":"false");b.classList.toggle("off",!ui.pre);
     const l=ui.pre?"Hide optimal (H)":"Show optimal (H)";b.setAttribute("aria-label",l);b.title=l;if(panelOpen())$("zPre").checked=ui.pre}
   function setPre(on){ui.pre=on;saveUI();eyeUI();tagUI();setTarget();progUI()}
   $("zEye").addEventListener("click",e=>{e.currentTarget.blur();setPre(!ui.pre)});
   $("zStatBtn").addEventListener("click",e=>{e.currentTarget.blur();setStats(!ui.stats)});
-  tabs.forEach(t=>t.addEventListener("click",e=>{e.currentTarget.blur();select(t.dataset.key)}));
 
   /* ---------- settings panel ---------- */
   const panelOpen=()=>!panel.hidden;
   function closePanel(){if(!panel.hidden){panel.hidden=true;$("zGear").setAttribute("aria-expanded","false")}}
-  function openPanel(page){fillPanel();showPage(page||ui.spage||"method");panel.hidden=false;$("zGear").setAttribute("aria-expanded","true")}
+  function openPanel(page){PK=SECS.includes(C.key)?C.key:checked()[0]||"3x2";fillPanel();showPage(page||ui.spage||"method");panel.hidden=false;$("zGear").setAttribute("aria-expanded","true")}
   function showPage(pg){ui.spage=pg;saveUI();panel.querySelectorAll(".zp-nav button").forEach(b=>{if(b.dataset.page===pg)b.setAttribute("aria-current","page");else b.removeAttribute("aria-current")});
     panel.querySelectorAll(".zp-page").forEach(x=>x.classList.toggle("on",x.dataset.page===pg));panel.querySelector(".zp-body").scrollTop=0}
   panel.querySelector(".zp-nav").addEventListener("click",e=>{const b=e.target.closest("[data-page]");if(b)showPage(b.dataset.page)});
   panel.addEventListener("pointerdown",e=>{if(e.target===panel)closePanel()});   // the dimmed backdrop
-  function fillSeq(){const c=ui.seq,stg=seqStages();
-    $("zSeqFrom").innerHTML=SEQ_ST.map(k=>`<option value="${k}">${SEQ_FROM[k]}</option>`).join("");$("zSeqFrom").value=c.start;
-    $("zSeqTo").innerHTML=seqEnds(c.start).map(([v,t])=>`<option value="${v}">${t}</option>`).join("");$("zSeqTo").value=c.end;
-    $("zSeqMirRow").hidden=!ALT[c.start];$("zSeqMir").checked=!!c.mir.start;
-    $("zSeqMirNote").textContent=ALT[c.start]?`Scrambles also start as the ${ALT[c.start].pk} (the ${c.start} turned on its side).`:"";
-    const TT={"4x4":"4x4 · first line","4x3":"4x3 · column 5-9-13","3x3":"3x3 · line 6-8","3x2":"3x2"};
-    $("zSeqStages").innerHTML=stg.map(x=>`<div class="zp-stage"><label class="zp-row">${TT[x.st]}<select data-st="${x.st}">${x.L.map(m=>`<option value="${esc(m.id)}">${esc(m.name)}${m.custom?" (custom)":""}</option>`).join("")}</select></label>`+
-      (SQ[x.st]?`<label class="zp-check zp-sub"><input type="checkbox" role="switch" data-mir="${x.st}"${c.mir[x.st]?" checked":""}${lineOf(x.st,x.M)?"":" disabled"}><span>Pick the best order<small>${lineOf(x.st,x.M)?`Row or column first, your call: build either, and the better one by this method is the standard. The worse one is a miss.`:"This method has no row or column to choose between."}</small></span></label>`:"")+`</div>`).join("")+
-      (stg.length&&stg[stg.length-1].st!=="3x2"&&stg[stg.length-1].M.steps.some(x=>x.rest)?`<p class="note">${stg[stg.length-1].M.name} finishes the puzzle, so no later stage is asked.</p>`:"");
-    stg.forEach(x=>{$("zSeqStages").querySelector(`[data-st="${x.st}"]`).value=x.M.id})}
-  function fillPanel(){const d=C.d,key=C.key,S=C.S,M=S.M,isSeq=key==="seq";
-    $("zSeqSec").hidden=!isSeq;$("zMethSec").hidden=isSeq;if(isSeq)fillSeq();$("zpNavMethod").textContent=isSeq?"Sequence":"Method";
-    const canFlex=isSeq?true:orderable(baseMethod(key).steps);$("zFlex").checked=!!ui.flex[key]&&canFlex;$("zFlex").disabled=!canFlex;
-    $("zFlexNote").textContent=canFlex?`The method's steps may go in any order that works, starting from either end of the line: 3-4 then 1-2 as well as 1-2 then 3-4, and 13 then 5-9 as well as 5 then 9-13. The first group you finish picks the order; the best order (the lowest total these steps allow) is the standard, and a worse one is a miss.${isSeq?" Applies to every stage.":" Progress is kept apart from the fixed order."}`
+  /* the panel edits one section at a time (tabs at its top): its method, scrambles and progress */
+  let PK=null;
+  function fillPanel(){if(!SECS.includes(PK))PK=SECS.includes(C.key)?C.key:checked()[0]||"3x2";
+    const key=PK,S=sOf(key),d=S.d,M=S.M;
+    $("zpSecs").innerHTML=SECS.map(k=>`<button type="button" data-psec="${k}"${k===key?' aria-current="true"':""}>${k}${ui.secs.includes(k)?"":'<i title="not checked: played for you"></i>'}</button>`).join("");
+    const later=SECS.slice(SECS.indexOf(key)+1).filter(k=>ui.secs.includes(k)),fin=M.steps.some(x=>x.rest||x.prefix)&&later.length;
+    $("zpSecNote").textContent=!ui.secs.includes(key)?`Not checked: played for you with this method${fin?` (up to its own end, since you solve the ${later.join(", ")})`:""}.`
+      :fin?`This method finishes the puzzle, so you solve the ${later.join(", ")} as part of it, graded here.`:"";
+    const canFlex=orderable(baseMethod(key).steps);$("zFlex").checked=!!ui.flex[key]&&canFlex;$("zFlex").disabled=!canFlex;
+    $("zFlexNote").textContent=canFlex?`The method's steps may go in any order that works, starting from either end of the line: 3-4 then 1-2 as well as 1-2 then 3-4, and 13 then 5-9 as well as 5 then 9-13. The first group you finish picks the order; the best order (the lowest total these steps allow) is the standard, and a worse one is a miss. Progress is kept apart from the fixed order.`
       :"This method's steps can only go one way (a single step, a set-up, or a last tile that has to come last).";
-    $("zSize").value=ui.size[key];$("zPre").checked=ui.pre;$("zHover").checked=ui.hover;$("zTimer").checked=ui.timer;$("zBuf").value=String(ui.buf);$("zPace").value=String(ui.pace);
-    const pzn=isSeq?"sequence":key;$("zPuz").textContent=isSeq?"Sequence":key;$("zPuz2").textContent=pzn;$("zPuz3").textContent=pzn;
-    const L=isSeq?[M]:methods(key);
+    $("zSize").value=ui.sz;$("zRmode").value=ui.rmode;$("zPre").checked=ui.pre;$("zHover").checked=ui.hover;$("zTimer").checked=ui.timer;$("zBuf").value=String(ui.buf);$("zPace").value=String(ui.pace);
+    $("zPuz2").textContent=key;$("zPuz3").textContent=key;
+    const L=methods(key);
     $("zMeth").innerHTML=L.map(m=>`<option value="${m.id}">${esc(m.name)}${m.custom?" (custom)":""}</option>`).join("");$("zMeth").value=M.base||M.id;
     $("zMethNote").textContent=M.desc+(M.exp?` Expected: ${M.exp}.`:"");
     $("zCustomDel").hidden=!M.custom;$("zCustomErr").textContent="";
@@ -736,63 +829,57 @@ const ZEN=(function(){
     let miss="";const ks=s.filter(x=>x.k!=null&&!x.p);if(ks.length>=5){const c={};ks.forEach(x=>{c[x.k+1]=(c[x.k+1]||0)+1});const top=Object.entries(c).sort((a,b)=>b[1]-a[1])[0];miss=` · misses most often on move ${top[0]} (${Math.round(top[1]/ks.length*100)}%)`}
     $("zCounts").hidden=!n;$("zCounts").textContent=`last ${n} solves · standard met ${rc.n?Math.round(rc.pass/rc.n*100):0}%${nm!=null?` · ${nm} cases cleared`:""} · ${nc} in review${miss}`;
     $("zUse").hidden=!(key==="3x3"&&S.classic)||!n;
-    $("zAltRow").hidden=!ALT[key]||isSeq;$("zAlt").checked=!!ui.alt[key];$("zAltTxt").innerHTML=ALTTXT[key]||"";
+    $("zAltRow").hidden=!ALT[key];$("zAlt").checked=!!ui.alt[key];$("zAltTxt").innerHTML=ALTTXT[key]||"";
     const mm=mergeMode(key),RDv=S.ready?reliableDepth(S):0,multiStep=M.steps.length>1;
     $("zMerge").innerHTML=[["auto",`Auto · ${RDv?`your 80% depth: ${RDv}`:"not enough solves yet"}`],["off","Off · always the method's steps"]].concat([8,10,12,15,18,20,25,30].map(v=>[String(v),`Up to ${v} moves`])).map(([v,t])=>`<option value="${v}">${t}</option>`).join("");
     $("zMerge").value=String(mm);$("zMerge").disabled=!multiStep;
     $("zMergeNote").textContent=multiStep?"When this step and the next ones can be done as one, and that combined optimum is within the depth you already solve reliably (Auto: at least 80% of your steps up to that many moves meet the standard), you get the combined step, e.g. the whole row instead of two pairs. It's never longer than the steps one by one.":"This method is a single step, so there is nothing to combine.";
-    const canPick=!isSeq&&!!lineOf(key,curMethodNoPick(key));$("zPickRow").hidden=!SQ[key]||isSeq;$("zPick").checked=!!ui.pick[key]&&canPick;$("zPick").disabled=!canPick;
+    const canPick=!!lineOf(key,curMethodNoPick(key));$("zPickRow").hidden=!SQ[key];$("zPick").checked=!!ui.pick[key]&&canPick;$("zPick").disabled=!canPick;
     $("zPickNote").textContent=canPick?`Each case first asks: column or row first? (${KEYMAP.label(KEYMAP.keys("left")[0]||"")} column, ${KEYMAP.label(KEYMAP.keys("right")[0]||"")} row, or tap.) You then build it with this method, turned to match. The method decides which is better: the lowest total its own steps allow, so a pick that only looks shorter as a whole line can still be wrong. A worse pick is a miss. Progress is kept apart from the plain method.`
       :"This method has no first row or column to choose: it solves the whole puzzle, picks for you, or never completes a line.";
-    $("zConfirm").hidden=true;$("zConfirmAll").hidden=true;$("zImportAsk").hidden=true;$("zImportMsg").textContent="";simUI()}
+    $("zConfirm").hidden=true;$("zConfirmAll").hidden=true;$("zImportAsk").hidden=true;$("zImportMsg").textContent="";simUI(S)}
+  $("zpSecs").addEventListener("click",e=>{const b=e.target.closest("[data-psec]");if(!b)return;PK=b.dataset.psec;fillPanel()});
   $("zGear").addEventListener("click",e=>{e.currentTarget.blur();if(panelOpen())closePanel();else openPanel()});
   $("zClose").addEventListener("click",closePanel);
-  $("zSize").addEventListener("input",e=>{ui.size[C.key]=+e.target.value;saveUI();layout()});
+  $("zSize").addEventListener("input",e=>{ui.sz=+e.target.value;saveUI();layout()});
+  $("zRmode").addEventListener("change",e=>{ui.rmode=e.target.value;saveUI()});
   $("zPre").addEventListener("change",e=>setPre(e.target.checked));
   $("zHover").addEventListener("change",e=>{ui.hover=e.target.checked;saveUI()});
   $("zTimer").addEventListener("change",e=>{ui.timer=e.target.checked;saveUI();if(C.phase==="solve"||C.phase==="lock")setSub()});
   $("zBuf").addEventListener("change",e=>{ui.buf=+e.target.value;saveUI()});
   $("zPace").addEventListener("change",e=>{ui.pace=e.target.value;saveUI()});
-  $("zMeth").addEventListener("change",e=>{setMethod(e.target.value);fillPanel()});
+  $("zMeth").addEventListener("change",e=>{setMethod(PK,e.target.value)});
   const ALTTXT={"3x2":"Also train the 2x3 finish<small>As if column 6-10-14 were solved first, leaving 7 8 / 11 12 / 15. Its 359 positions are their own cases, added to the pool while this is on. Your method carries over (10-14 becomes 7-8).</small>",
     "4x3":"Also train the 3x4<small>As if column 1-5-9-13 were solved first instead of row 1, leaving 2 3 4 / 6 7 8 / 10 11 12 / 14 15. Its cases are their own, added to the pool while this is on. Your method carries over (column 5-9-13 becomes row 2-3-4).</small>"};
-  $("zAlt").addEventListener("change",e=>{ui.alt[C.key]=e.target.checked;saveUI();layout();fillPanel();progUI();next()});
-  const seqChanged=()=>{saveUI();select("seq");fillPanel()};
-  $("zSeqFrom").addEventListener("change",e=>{ui.seq.start=e.target.value;seqChanged()});
-  $("zSeqTo").addEventListener("change",e=>{ui.seq.end=e.target.value;seqChanged()});
-  $("zSeqMir").addEventListener("change",e=>{ui.seq.mir.start=e.target.checked;seqChanged()});
-  $("zSeqStages").addEventListener("change",e=>{const t=e.target;if(t.dataset.mir){ui.seq.mir[t.dataset.mir]=t.checked;seqChanged();return}
-    const st=t.dataset.st;if(!st)return;ui.seq.m[st]=t.value;seqChanged()});
-  $("zMerge").addEventListener("change",e=>{const v=e.target.value;ui.merge[C.key]=v;saveUI();if(C.S){C.S.ready=false;}select(C.key);fillPanel()});
-  $("zFlex").addEventListener("change",e=>{ui.flex[C.key]=e.target.checked;saveUI();select(C.key);fillPanel()});
-  $("zPick").addEventListener("change",e=>{ui.pick[C.key]=e.target.checked;saveUI();select(C.key);fillPanel()});
-  $("zPool").addEventListener("change",e=>{const S=C.S;if(!S.classic)return;S.prog.src=e.target.value;save(S);fillPanel();progUI();next()});
-  function setRange(){const S=C.S;let lo=+$("zDlo").value,hi=+$("zDhi").value;if(lo>hi){if(this===$("zDlo"))hi=lo;else lo=hi}
-    ui.rng[C.key+":"+S.M.id]=[lo,hi];saveUI();$("zDlo").value=String(lo);$("zDhi").value=String(hi);next()}
+  $("zAlt").addEventListener("change",e=>{ui.alt[PK]=e.target.checked;saveUI();refresh()});
+  $("zMerge").addEventListener("change",e=>{ui.merge[PK]=e.target.value;saveUI();sOf(PK).ready=false;refresh()});
+  $("zFlex").addEventListener("change",e=>{ui.flex[PK]=e.target.checked;saveUI();refresh()});
+  $("zPick").addEventListener("change",e=>{ui.pick[PK]=e.target.checked;saveUI();refresh()});
+  $("zPool").addEventListener("change",e=>{const S=sOf(PK);if(!S.classic)return;S.prog.src=e.target.value;save(S);refresh()});
+  function setRange(){const S=sOf(PK);let lo=+$("zDlo").value,hi=+$("zDhi").value;if(lo>hi){if(this===$("zDlo"))hi=lo;else lo=hi}
+    ui.rng[PK+":"+S.M.id]=[lo,hi];saveUI();$("zDlo").value=String(lo);$("zDhi").value=String(hi);refresh()}
   $("zDlo").addEventListener("change",setRange);$("zDhi").addEventListener("change",setRange);
-  $("zCustomAdd").addEventListener("click",()=>{const key=C.key,txt=$("zCustom").value.trim();let M;
+  $("zCustomAdd").addEventListener("click",()=>{const key=PK,txt=$("zCustom").value.trim();let M;
     try{M=METHODS.parse(key,txt)}catch(e){$("zCustomErr").textContent=e.message;return}
-    const L=ui.custom[key]=ui.custom[key]||[];if(!L.includes(txt))L.push(txt);$("zCustom").value="";setMethod(M.id);fillPanel()});
-  $("zCustomDel").addEventListener("click",()=>{const key=C.key,M=C.S.M;if(!M.custom)return;ui.custom[key]=(ui.custom[key]||[]).filter(t=>t!==M.custom);delete ui.meth[key];setMethod(DEFAULT[key]);fillPanel()});
-  $("zUse").addEventListener("click",()=>{const s=hist(C.S).slice(-100),L=s.length;if(!L)return;
-    document.getElementById("advSize").value=C.key;document.getElementById("advAvg").value=L>=100?"100":L>=50?"50":L>=12?"12":"5";
+    const L=ui.custom[key]=ui.custom[key]||[];if(!L.includes(txt))L.push(txt);$("zCustom").value="";setMethod(key,M.id)});
+  $("zCustomDel").addEventListener("click",()=>{const key=PK,M=sOf(key).M;if(!M.custom)return;ui.custom[key]=(ui.custom[key]||[]).filter(t=>t!==M.custom);delete ui.meth[key];setMethod(key,DEFAULT[key])});
+  $("zUse").addEventListener("click",()=>{const s=hist(sOf(PK)).slice(-100),L=s.length;if(!L)return;
+    document.getElementById("advSize").value=PK;document.getElementById("advAvg").value=L>=100?"100":L>=50?"50":L>=12?"12":"5";
     document.getElementById("advMoves").value=(s.reduce((x,y)=>x+y.m,0)/L).toFixed(1);document.getElementById("advTime").value=(s.reduce((x,y)=>x+y.t,0)/L).toFixed(3);
     document.getElementById("advNote").textContent=`Using your last ${L} trainer solves (mean, not a trimmed average).`;
     advisor.update(true);closePanel();if(isFS())toggleFS();location.hash="#advisor"});
 
   /* ---------- reset, export, import ---------- */
   const lsKeys=()=>{const r=[];try{for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k&&k.startsWith("ssa"))r.push(k)}}catch(e){}return r};
-  // sequence progress lives under the start puzzle's keys with "seq:" in the method id; each tab resets only its own
-  const puzzleKey=(k,key)=>key==="seq"?k.includes("-seq:"):!k.includes("-seq:")&&(k==="ssa-v3-"+key||k==="ssa-prog-v1-"+key||k==="ssa3-"+key||k.startsWith("ssa-m-"+key+"-")||k.startsWith("ssa4-"+key+"-"));
-  function wipe(key){lsKeys().filter(k=>puzzleKey(k,key)).forEach(k=>{try{localStorage.removeItem(k)}catch(e){}});histForget();
-    if(key==="seq"){for(const z in Z)for(const id in Z[z].ms)if(id.startsWith("seq:"))delete Z[z].ms[id]}
-    else{const keep={};if(Z[key])for(const id in Z[key].ms)if(id.startsWith("seq:"))keep[id]=Z[key].ms[id];delete Z[key];if(Object.keys(keep).length)data(key).ms=keep}}
+  // a section's saved data (progress, reviews, history for every method; the old sequence trainer's under "-seq:" too)
+  const puzzleKey=(k,key)=>k==="ssa-v3-"+key||k==="ssa-prog-v1-"+key||k==="ssa3-"+key||k.startsWith("ssa-m-"+key+"-")||k.startsWith("ssa4-"+key+"-");
+  function wipe(key){lsKeys().filter(k=>puzzleKey(k,key)).forEach(k=>{try{localStorage.removeItem(k)}catch(e){}});histForget();delete Z[key]}
   $("zReset").addEventListener("click",()=>{$("zConfirm").hidden=false});
   $("zResetNo").addEventListener("click",()=>{$("zConfirm").hidden=true});
-  $("zResetYes").addEventListener("click",()=>{wipe(C.key);closePanel();select(C.key)});
+  $("zResetYes").addEventListener("click",()=>{wipe(PK);closePanel();refresh()});
   $("zWipe").addEventListener("click",()=>{$("zConfirmAll").hidden=false});
   $("zWipeNo").addEventListener("click",()=>{$("zConfirmAll").hidden=true});
-  $("zWipeYes").addEventListener("click",()=>{KEYS.forEach(wipe);closePanel();select(C.key)});
+  $("zWipeYes").addEventListener("click",()=>{KEYS.forEach(wipe);closePanel();refresh()});
   $("zExport").addEventListener("click",()=>{const data={};lsKeys().forEach(k=>{data[k]=store.get(k)});
     const blob=new Blob([JSON.stringify({app:"speedsliding-atlas",version:1,exported:new Date().toISOString(),data},null,1)],{type:"application/json"});
     const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=`speedsliding-progress-${new Date().toISOString().slice(0,10)}.json`;
@@ -817,7 +904,7 @@ const ZEN=(function(){
   $("zImportCancel").addEventListener("click",()=>{pending=null;$("zImportAsk").hidden=true;$("zImportMsg").textContent=""});
 
   targetEl.addEventListener("click",e=>{const a=e.target.closest("[data-pick]");if(a){a.blur();choosePick(a.dataset.pick)}});
-  fbEl.addEventListener("click",e=>{const a=e.target.closest("[data-z]");if(!a)return;a.blur();if(a.dataset.z==="replay"&&C.rv)replayBack();if(a.dataset.z==="next")next();if(a.dataset.z==="drill")setDrill(true);if(a.dataset.z==="exit")setDrill(false)});
+  fbEl.addEventListener("click",e=>{const a=e.target.closest("[data-z]");if(!a)return;a.blur();const z=a.dataset.z;if(C.rv&&C.phase==="review"){if(z==="again")rvAgain();if(z==="back")rvStep(-1);if(z==="fwd")rvStep(1);if(z==="yours")rvSwap();if(z==="next"){rvNext();return}}if(z==="next")next();if(a.dataset.z==="drill")setDrill(true);if(a.dataset.z==="exit")setDrill(false)});
   $("zDrill").addEventListener("click",e=>{e.currentTarget.blur();setDrill(!C.S.drill)});
   stage.addEventListener("pointerdown",e=>{if(!e.target.closest("#zPanel"))closePanel()});
 
@@ -844,12 +931,11 @@ const ZEN=(function(){
     C.rv=null;C.phase="solve";boardCls("");seqEl.innerHTML="";startStep();render();stepsUI();tagUI();setTarget();setSub()}
   function slip(){flushFinish();const S=C.S;if(!S||!C.it)return;
     const many=C.snaps.length>1||C.steps.length>1;
-    if(C.phase==="review"&&C.undo){const u=C.undo,o=JSON.parse(u.prog);setHist(S,u.h);
-      for(const k of Object.keys(S.prog))delete S.prog[k];Object.assign(S.prog,o);save(S);if(S.classic)recount(S.d);
-      if(S.drill&&u.drill)S.drill.streak=JSON.parse(u.drill);C.streak=u.streak;S.sess=u.sess;C.undo=null;progUI();
-      if(!many){load(u.it);fb('<span class="z-mute">mouse slip · the miss was taken back · same case again</span>');return}
-      clearTimers();const sn=C.snaps.pop();C.running=true;C.t0=performance.now()-(C.time||0)*1000;requestAnimationFrame(tick);
-      restoreSnap(sn);fb('<span class="z-mute">mouse slip · the miss was taken back · back to the start of the last step</span>');return}
+    // after an attempt with a miss: take back what every section of it recorded, and the same case again
+    if(C.phase==="review"&&C.run&&C.run.undo.length){const run=C.run;
+      run.undo.slice().reverse().forEach(u=>{const S=u.S,o=JSON.parse(u.prog);setHist(S,u.h);for(const k of Object.keys(S.prog))delete S.prog[k];Object.assign(S.prog,o);save(S);
+        if(S.classic)recount(S.d);if(S.drill&&u.drill)S.drill.streak=JSON.parse(u.drill);S.sess=u.sess});
+      C.streak=0;begin(Object.assign({},run.st,{segs:[]}));fb('<span class="z-mute">mouse slip · taken back · same case again</span>');return}
     if(C.phase==="solve"&&many){
       if(C.sp.length){restoreSnap(C.snaps.pop());fb('<span class="z-mute">mouse slip · back to the start of this step</span>');return}
       C.snaps.pop();let sn=C.snaps.pop();
@@ -860,8 +946,8 @@ const ZEN=(function(){
   function helpUI(){$("zHelpKeys").innerHTML=[
       [kb("left"),"slide a tile left · picks the column"],[kb("right"),"slide a tile right · picks the row"],[kb("up"),"slide a tile up"],[kb("down"),"slide a tile down"],
       ["click / tap","any tile in the gap's row or column"],[kb("next"),"next case"],[kb("slip"),"mouse slip: restart the case, taking back a miss"],
-      [kb("replay"),"in a review: back to the start of this part (again quickly: further back)"],[kb("optimal"),"show / hide optimal"],[kb("stats"),"show / hide stats (session, ao100, ao200…)"],[kb("fs"),"fullscreen"],
-      [kb("p1")+kb("p2")+kb("p3")+kb("p4"),"switch puzzle"],[kb("p5"),"sequence trainer"]].map(([k,t])=>`<li><span>${k}</span>${t}</li>`).join("")}
+      [kb("replay"),"in a review: play this mistake again, slower each time"],[kb("left")+kb("right"),"in a review: step back / on one move"],[kb("compare"),"in a review: your way ⇄ the best"],[kb("optimal"),"show / hide optimal"],[kb("stats"),"show / hide stats (session, ao100, ao200…)"],[kb("fs"),"fullscreen"],
+      [kb("p1")+kb("p2")+kb("p3")+kb("p4"),"train one section alone: 3x2, 3x3, 4x3, 4x4"],[kb("p5"),"train the whole solve (every section)"]].map(([k,t])=>`<li><span>${k}</span>${t}</li>`).join("")}
   KEYMAP.onChange(()=>{helpUI();if(C.phase==="pick")setTarget()});
   const DIR={left:"L",right:"R",up:"U",down:"D"};
   document.addEventListener("keydown",e=>{
@@ -872,13 +958,16 @@ const ZEN=(function(){
     const a=KEYMAP.action(e.key);if(!a)return;e.preventDefault();
     const dir=DIR[a];
     if(dir&&C.phase==="pick"){if(dir==="L")choosePick("col");else if(dir==="R")choosePick("row");return}
+    // in a review the left / right keys step through the mistake one move at a time
+    if(dir&&C.phase==="review"&&C.rv){if(dir==="L")rvStep(-1);else if(dir==="R")rvStep(1);return}
     if(dir){moveDir(dir);return}
-    if(a==="next"){if(C.phase!=="build")next()}
+    if(a==="next"){if(C.phase==="review"&&C.rv)rvNext();else if(C.phase!=="build")next()}
     else if(a==="slip")slip();
-    else if(a==="replay"){if(C.rv&&(C.phase==="review"||C.phase==="done"))replayBack()}
+    else if(a==="replay"){if(C.rv&&C.phase==="review")rvAgain()}
+    else if(a==="compare"){if(C.rv&&C.phase==="review")rvSwap()}
     else if(a==="fs")toggleFS();else if(a==="optimal")setPre(!ui.pre);else if(a==="stats")setStats(!ui.stats);
-    else if(/^p[1-5]$/.test(a))select(KEYS[+a[1]-1])});
+    else if(/^p[1-4]$/.test(a))select(KEYS[+a[1]-1]);else if(a==="p5"){ui.secs=SECS.slice();saveUI();refresh()}});
 
-  return{start(){helpUI();eyeUI();liveUI();select(KEYS.includes(ui.tab)?ui.tab:"3x2")},select,layout,_state:()=>C,
+  return{start(){buildCells();setFrame("4x4");helpUI();eyeUI();liveUI();refresh()},select,layout,_state:()=>C,
     exitPseudo(){if(root.classList.contains("pfs"))setPseudo(false)}};
 })();
